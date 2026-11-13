@@ -30,6 +30,8 @@ Panel {
   property string confirmMessage: ""
   property string confirmLabel: ""
   property var confirmAction: null
+  // 0 = cancel, 1 = confirm; the dialog lives in lazily built content.
+  property int confirmIndex: 1
 
   property double clock: Date.now()
 
@@ -248,7 +250,7 @@ Panel {
     confirmMessage = message
     confirmLabel = label
     confirmAction = action
-    confirm.selectedIndex = 1
+    confirmIndex = 1
     confirmOpen = true
   }
 
@@ -471,7 +473,7 @@ Panel {
 
       onMoveRequested: function(dx, dy) {
         if (root.confirmOpen) {
-          confirm.selectedIndex = confirm.selectedIndex === 0 ? 1 : 0
+          root.confirmIndex = root.confirmIndex === 0 ? 1 : 0
           return
         }
         if (dx < 0) root.back()
@@ -480,7 +482,7 @@ Panel {
       }
       onActivateRequested: {
         if (!root.confirmOpen) root.activateCursor()
-        else if (confirm.selectedIndex === 1) root.runConfirm()
+        else if (root.confirmIndex === 1) root.runConfirm()
         else root.cancelConfirm()
       }
       onCloseRequested: {
@@ -488,7 +490,7 @@ Panel {
         else if (!root.back()) root.close()
       }
       onTabRequested: function(direction) {
-        if (root.confirmOpen) confirm.selectedIndex = confirm.selectedIndex === 0 ? 1 : 0
+        if (root.confirmOpen) root.confirmIndex = root.confirmIndex === 0 ? 1 : 0
         else root.switchPanel(direction)
       }
       onTextKey: function(text) {
@@ -531,6 +533,8 @@ Panel {
         anchors.fill: parent
         z: 10
         opened: root.confirmOpen
+        selectedIndex: root.confirmIndex
+        onSelectedIndexChanged: root.confirmIndex = selectedIndex
         message: root.confirmMessage
         confirmText: root.confirmLabel
         foreground: root.foreground
@@ -1305,6 +1309,16 @@ Panel {
     fontFamily: root.fontFamily
     opacity: enabled ? 1 : 0.4
     onHovered: function(isHovered) { if (isHovered && actionButton.enabled && actionButton.cursorTarget) root.setCursor(actionButton) }
+
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -Style.space(2)
+      visible: actionButton.hasCursor
+      color: "transparent"
+      radius: Style.cornerRadius > 0 ? Style.cornerRadius + Style.space(2) : 0
+      border.width: Math.max(1, Style.normalBorderWidth)
+      border.color: root.accent
+    }
   }
 
   component NavRow: CursorSurface {
