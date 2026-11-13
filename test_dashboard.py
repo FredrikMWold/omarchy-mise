@@ -10,86 +10,87 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from mise_dashboard import Client, DashboardError, MAX_OUTPUT, run, sanitize
+from mise_dashboard import (Client, DashboardError, MAX_OUTPUT, conflict_entries, parse_log,
+                            parse_patch, run, sanitize)
+
+SCRIPT = Path(__file__).with_name("mise_dashboard.py")
 
 
-class DashboardTests(unittest.TestCase):
-    def test_uses_mise_selected_configs_including_common_and_arbitrary_profile(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            common = root / "config.toml"
-            profile = root / "config.train.toml"
-            inactive = root / "config.unselected.toml"
-            common.write_text('[tools]\nnode = "latest"\n')
-            profile.write_text('[bootstrap.repos]\n"~/work" = {url = "https://example.invalid/repo"}\n')
-            inactive.write_text('[tools]\nwrong = "latest"\n')
-            client = Client()
-            client.json = lambda *args: [{"path": str(profile)}, {"path": str(common)}]
-            configs, origins = client.sources()
-            self.assertEqual(client.active_profiles, ["train"])
-            self.assertEqual([item["scope"] for item in configs], ["train", "common"])
-            self.assertEqual(origins[("tool", "node")][0], "common")
-            self.assertEqual(origins[("repo", "~/work")][0], "train")
-            self.assertNotIn(("tool", "wrong"), origins)
-            self.assertNotIn("-E", client.command)
-
-    def test_lazy_tools_are_not_pending_bootstrap_changes_and_common_override_wins(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            common = root / "config.toml"
-            system = root / "omarchy-tools.toml"
-            common.write_text('[tools]\nnode = "latest"\n')
-            system.write_text('[tools]\nnode = {version = "latest", lazy = true}\namp = {version = "latest", lazy = true}\n')
-            client = Client()
-            client.json = lambda *args: [{"path": str(common)}, {"path": str(system)}]
-            _, origins = client.sources()
-            status = {"tools": [
-                {"tool": "node", "state": "missing", "requested_version": "latest"},
-                {"tool": "amp", "state": "missing", "requested_version": "latest"},
-            ]}
-            actual = client.bootstrap_rows(status, {"resources": []}, origins)
-            self.assertEqual([item["action"] for item in actual], ["missing", "on-demand"])
-
-    def test_fetch_is_fetch_only_and_preserves_a_visible_failure(self):
+class ParsingTests(unittest.TestCase):
+    def test_git_patch_splits_files_maps_paths_and_hides_internal_metadata(self):
         client = Client()
-        calls = []
-        client.snapshot = lambda: {"errors": []}
-        client.operation_lock = contextlib.nullcontext
-        client.call = lambda *args: calls.append(args)
-        self.assertIsNone(client.fetch()["fetch_error"])
-        self.assertEqual(calls, [("dot", "sync", "--fetch-only")])
-        with patch.object(client, "call", side_effect=DashboardError("offline")):
-            self.assertEqual(client.fetch()["fetch_error"], "offline")
+        text = "\n".join([
+            "diff --git a/.mise-history/manifest.json b/.mise-history/manifest.json",
+            "--- a/.mise-history/manifest.json", "+++ b/.mise-history/manifest.json",
+            "@@ -1 +1 @@", "-x", "+y",
+            "diff --git a/home@laptop/.bashrc b/home@laptop/.bashrc",
+            "new file mode 100644", "--- /dev/null", "+++ b/home@laptop/.bashrc",
+            "@@ -0,0 +1,2 @@", "+alias ll='ls -l'", "+-- not a header",
+            "diff --git a/config/config.desktop.toml b/config/config.desktop.toml",
+            "--- a/config/config.desktop.toml", "+++ b/config/config.desktop.toml",
+            "@@ -1,2 +1,1 @@", " [tools]", "-node = 'latest'",
+        ])
+        parsed = parse_patch(text, client.repo_display)
+        self.assertEqual(parsed["hidden"], 1)
+        bashrc, config = parsed["files"]
+        self.assertEqual((bashrc["path"], bashrc["scope"], bashrc["status"]), ("~/.bashrc", "laptop", "added"))
+        self.assertEqual((bashrc["additions"], bashrc["deletions"]), (2, 0))
+        self.assertEqual(bashrc["lines"][-1], {"t": "+", "s": "-- not a header"})
+        self.assertEqual((config["path"], config["scope"]), ("~/.config/mise/config.desktop.toml", "desktop"))
+        self.assertEqual([line["t"] for line in config["lines"]], ["@", " ", "-"])
 
-    def test_preview_includes_stderr_and_never_uses_apply_commands(self):
-        client = Client()
-        client.call = lambda *args, **kwargs: ("", "would run a bootstrap hook\n")
-        result = client.preview("bootstrap")
-        self.assertIn("--dry-run", result["text"])
-        self.assertIn("would run a bootstrap hook", result["text"])
-        self.assertFalse(result["truncated"])
-        with self.assertRaises(DashboardError):
-            client.preview("bootstrap; touch /tmp/wrong")
+    def test_conflict_patch_keeps_live_path_and_reason(self):
+        text = "\n".join([
+            "Conflict: ~/clash.txt (both sides changed the same lines)",
+            "diff --git a~/clash.txt (local) b~/clash.txt (remote)",
+            "index 1..2 100644", "--- a~/clash.txt (local)", "+++ b~/clash.txt (remote)",
+            "@@ -1 +1 @@", "-mine", "+theirs",
+        ])
+        (conflict,) = parse_patch(text, Client().repo_display)["files"]
+        self.assertEqual(conflict["path"], "~/clash.txt")
+        self.assertEqual(conflict["reason"], "both sides changed the same lines")
+        self.assertEqual((conflict["additions"], conflict["deletions"]), (1, 1))
+        self.assertEqual(conflict_entries({"conflicts": [["~/clash.txt", "why"]]}),
+                         [{"path": "~/clash.txt", "reason": "why"}])
 
-    def test_partial_status_failure_is_not_reported_as_healthy(self):
-        client = Client()
-        client.sources = lambda: ([], {})
-        client.json = lambda *args: (_ for _ in ()).throw(DashboardError("status unavailable"))
-        with patch.object(Path, "exists", return_value=False):
-            result = client.snapshot()
-        self.assertEqual(len(result["errors"]), 4)
-        self.assertIn("Dotfiles: status unavailable", result["errors"])
-
-    def test_markup_stays_literal_and_controls_are_removed(self):
-        markup = '<img src="https://example.invalid/tracker"> & <b>name</b>'
+    def test_patch_limits_and_untrusted_text(self):
+        long = "+" + "x" * 2000
+        text = "diff --git a/home/a b/home/a\n@@ -0,0 +1 @@\n" + "\n".join([long] * 700)
+        (item,) = parse_patch(text, Client().repo_display)["files"]
+        self.assertEqual(item["additions"], 700)
+        self.assertEqual(len(item["lines"]) + item["omitted"], 701)
+        self.assertTrue(item["lines"][1]["s"].endswith("…"))
+        markup = '<img src="https://example.invalid/tracker">'
         self.assertEqual(sanitize({"name": markup})["name"], markup)
         self.assertEqual(sanitize("\x1b[31mred\x1b[0m\x00"), "red")
-        qml = Path(__file__).with_name("PlainText.qml").read_text()
-        self.assertIn("textFormat: Text.PlainText", qml)
-        panel = Path(__file__).with_name("Panel.qml").read_text()
-        self.assertIn("textFormat: TextEdit.PlainText", panel)
-        self.assertNotIn("tooltipText:", panel)
 
+    def test_bootstrap_log_classifies_stages(self):
+        lines = parse_log("mise bootstrap: system packages\nmise pacman: 17 package(s) already installed\n"
+                          "sh -o errexit -c 'omarchy plugin add x'\nmise repos: cloning y\n")
+        self.assertEqual([line["t"] for line in lines], ["stage", "ok", "run", "info"])
+
+    def test_profiles_come_from_mise_selected_configs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            common, profile, system = root / "config.toml", root / "config.train.toml", root / "tools.toml"
+            common.write_text('[tools]\nnode = "latest"\n')
+            profile.write_text('[bootstrap.repos]\n"~/work" = {url = "https://example.invalid/repo"}\n')
+            system.write_text('[tools]\nnode = {version = "latest", lazy = true}\namp = {version = "latest", lazy = true}\n')
+            client = Client()
+            client.json = lambda *args, **kwargs: [{"path": str(profile)}, {"path": str(common)}, {"path": str(system)}]
+            configs, origins = client.sources()
+            self.assertEqual(client.active_profiles, ["train"])
+            self.assertEqual(origins[("tool", "node")][0], "common")
+            self.assertEqual(origins[("repo", "~/work")][0], "train")
+            rows = client.bootstrap_rows({"tools": [
+                {"tool": "node", "state": "missing", "requested_version": "latest"},
+                {"tool": "amp", "state": "missing", "requested_version": "latest"},
+            ]}, {"resources": []}, origins)
+            self.assertEqual([row["state"] for row in rows], ["pending", "on-demand"])
+            self.assertNotIn("-E", client.command)
+
+
+class SafetyTests(unittest.TestCase):
     def test_bounded_commands_report_timeout_overflow_and_failure(self):
         self.assertEqual(run([sys.executable, "-c", "print('ok')"])[0], "ok\n")
         with self.assertRaisesRegex(DashboardError, "timed out"):
@@ -99,88 +100,157 @@ class DashboardTests(unittest.TestCase):
         with self.assertRaisesRegex(DashboardError, "failed"):
             run([sys.executable, "-c", "import sys; sys.exit('failed')"])
 
-    def test_apply_requires_terminal_and_never_accepts_arbitrary_commands(self):
+    def test_review_and_actions_reject_unknown_or_unsafe_arguments(self):
         client = Client()
-        with patch("sys.stdin", io.StringIO("yes\n")):
-            with self.assertRaisesRegex(DashboardError, "interactive terminal"):
-                client.apply("pull")
-        with self.assertRaisesRegex(DashboardError, "Unknown action"):
-            client.apply("pull --take-remote-all")
+        for kind, argument in (("checkpoint", "1; rm -rf ~"), ("checkpoint", "3 --exec=x"),
+                               ("path-history", "--output=/tmp/x"), ("nope", None)):
+            with self.subTest(kind=kind, argument=argument), self.assertRaises(DashboardError):
+                client.review(kind, argument)
+        with self.assertRaises(DashboardError):
+            client.act("undo", "latest")
+        with self.assertRaises(DashboardError):
+            client.act("rm", None)
 
-    def test_cancelled_confirmation_never_runs_an_action(self):
+    def test_bootstrap_requires_terminal_and_cancel_runs_nothing(self):
         client = Client()
-        client.preview = lambda kind: {"text": "fresh preview"}
-        with patch("sys.stdin.isatty", return_value=True), \
-                patch("builtins.input", return_value="no"), \
+        with patch("sys.stdin", io.StringIO("y\n")), self.assertRaisesRegex(DashboardError, "terminal"):
+            client.terminal("bootstrap")
+        client.call = lambda *args, **kwargs: ("mise bootstrap: tools\n", "")
+        with patch("sys.stdin.isatty", return_value=True), patch("builtins.input", return_value="n"), \
                 patch("subprocess.call") as apply, contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(client.apply("pull"), 0)
+            self.assertEqual(client.terminal("bootstrap"), 0)
         apply.assert_not_called()
 
-    def test_confirmed_action_records_failure_without_force_flags(self):
-        client = Client()
-        client.preview = lambda kind: {"text": "fresh preview"}
-        client.operation_lock = contextlib.nullcontext
-        with patch("sys.stdin.isatty", return_value=True), \
-                patch("builtins.input", side_effect=["yes", ""]), \
-                patch("subprocess.call", return_value=3) as apply, \
-                patch.object(client, "record_action") as record, \
-                contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(client.apply("bootstrap"), 3)
-        self.assertEqual(apply.call_args.args[0], client.command + ["bootstrap"])
-        self.assertEqual(record.call_args_list[-1].args, ("bootstrap", "failed", 3))
 
+@unittest.skipUnless(shutil.which("mise") and shutil.which("git"), "mise and git are required")
+class MiseFixtureTests(unittest.TestCase):
+    """Two machines sharing an origin, driven through the real CLI."""
 
-@unittest.skipUnless(shutil.which("mise"), "mise is required")
-class MiseIntegrationTests(unittest.TestCase):
-    def test_real_incoming_preview_leaves_live_file_unchanged(self):
-        with tempfile.TemporaryDirectory(prefix="mise-dashboard-test-") as directory:
-            root = Path(directory)
-            config = root / ".config/mise"
-            config.mkdir(parents=True)
-            (config / "config.toml").write_text('[dotfiles]\n"~/demo.txt" = {mode = "track"}\n')
-            target = root / "demo.txt"
-            target.write_text("before\n")
-            env = {
-                **os.environ, "HOME": directory, "MISE_ENV": "", "MISE_YES": "1",
-                "XDG_CONFIG_HOME": directory + "/.config",
-                "XDG_DATA_HOME": directory + "/.local/share",
-                "XDG_STATE_HOME": directory + "/.local/state",
-                "XDG_CACHE_HOME": directory + "/.cache",
-                "MISE_CONFIG_DIR": str(config),
-                "MISE_GLOBAL_CONFIG_FILE": str(config / "config.toml"),
-                "MISE_DATA_DIR": directory + "/.local/share/mise",
-                "MISE_STATE_DIR": directory + "/.local/state/mise",
-                "MISE_CACHE_DIR": directory + "/.cache/mise",
-                "MISE_SYSTEM_CONFIG_DIR": directory + "/etc/mise",
-            }
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix="mise-dashboard-test-")
+        self.root = Path(self.directory.name)
+        config = self.root / ".config/mise"
+        config.mkdir(parents=True)
+        (config / "config.toml").write_text(
+            '[dotfiles]\n"~/demo.txt" = {mode = "track"}\n"~/other.txt" = {mode = "track"}\n'
+            '"~/clash.txt" = {mode = "track"}\n')
+        for name, body in (("demo.txt", "line1\nline2\n"), ("other.txt", "a\n"), ("clash.txt", "base\n")):
+            (self.root / name).write_text(body)
+        home = str(self.root)
+        self.env = {
+            **os.environ, "HOME": home, "MISE_ENV": "", "MISE_YES": "1", "NO_COLOR": "1",
+            "XDG_CONFIG_HOME": home + "/.config", "XDG_DATA_HOME": home + "/.local/share",
+            "XDG_STATE_HOME": home + "/.local/state", "XDG_CACHE_HOME": home + "/.cache",
+            "MISE_CONFIG_DIR": str(config), "MISE_GLOBAL_CONFIG_FILE": str(config / "config.toml"),
+            "MISE_DATA_DIR": home + "/.local/share/mise", "MISE_STATE_DIR": home + "/.local/state/mise",
+            "MISE_CACHE_DIR": home + "/.cache/mise", "MISE_SYSTEM_CONFIG_DIR": home + "/etc/mise",
+            "PATH": os.environ["PATH"],
+        }
+        self.mise("dot", "save")
+        self.command("git", "init", "--bare", self.root / "origin.git")
+        self.mise("dot", "origin", "set", self.root / "origin.git", "--sync", "manual", "--yes")
+        state = self.root / ".local/state/mise"
+        shutil.copytree(state, self.root / "machine-a", symlinks=True)
+        # The other machine changes two files and publishes them.
+        self.write("demo.txt", 'line1\nCHANGED <img src="https://example.invalid/x">\nline3\n')
+        self.write("clash.txt", "theirs\n")
+        self.mise("dot", "save")
+        self.mise("dot", "sync")
+        shutil.rmtree(state)
+        shutil.copytree(self.root / "machine-a", state, symlinks=True)
+        self.write("demo.txt", "line1\nline2\n")
+        self.write("clash.txt", "base\n")
+        self.write("other.txt", "a\nlocal addition\n")
+        self.mise("dot", "save")
 
-            def command(*args):
-                result = subprocess.run(args, cwd=directory, env=env, text=True,
-                                        capture_output=True, timeout=30)
-                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-                return result.stdout
+    def tearDown(self):
+        self.directory.cleanup()
 
-            command("mise", "dot", "save")
-            command("git", "init", "--bare", str(root / "origin.git"))
-            command("mise", "dot", "origin", "set", str(root / "origin.git"), "--sync", "manual", "--yes")
-            state = root / ".local/state/mise"
-            shutil.copytree(state, root / "saved-state", symlinks=True)
-            target.write_text('after <img src="https://example.invalid/tracker">\n')
-            command("mise", "dot", "save")
-            command("mise", "dot", "sync")
-            state.rename(root / "remote-state")
-            shutil.copytree(root / "saved-state", state, symlinks=True)
-            target.write_text("before\n")
-            with patch.dict(os.environ, env, clear=True):
-                client = Client()
-                fetched = client.fetch()
-                self.assertIsNone(fetched["fetch_error"])
-                self.assertIn("~/demo.txt", fetched["history"]["sync"]["pending_applications"])
-                self.assertEqual(fetched["errors"], [])
-                preview = client.preview("incoming")
-                self.assertIn("~/demo.txt", preview["text"])
-                self.assertEqual(target.read_text(), "before\n")
-                self.assertEqual(client.snapshot()["dotfiles"][0]["scope"], "common")
+    def write(self, name, text):
+        (self.root / name).write_text(text)
+
+    def read(self, name):
+        return (self.root / name).read_text()
+
+    def command(self, *args):
+        result = subprocess.run([str(arg) for arg in args], cwd=self.root, env=self.env,
+                                text=True, capture_output=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        return result.stdout
+
+    def mise(self, *args):
+        return self.command("mise", *args)
+
+    def dash(self, *args):
+        result = subprocess.run([sys.executable, SCRIPT, *map(str, args)], env=self.env,
+                                text=True, capture_output=True, timeout=120)
+        return json.loads(result.stdout)
+
+    def data(self, *args):
+        result = self.dash(*args)
+        self.assertTrue(result["ok"], result)
+        return result["data"]
+
+    def test_fetch_partitions_incoming_and_outgoing_without_writing(self):
+        snapshot = self.data("fetch")
+        changes = snapshot["changes"]
+        self.assertIsNone(snapshot["fetch_error"])
+        self.assertEqual(sorted(item["path"] for item in changes["incoming"]), ["~/clash.txt", "~/demo.txt"])
+        self.assertEqual([item["path"] for item in changes["outgoing"]], ["~/other.txt"])
+        self.assertEqual(changes["outgoing"][0]["additions"], 1)
+        self.assertEqual(self.read("demo.txt"), "line1\nline2\n")
+
+        review = self.data("review", "incoming")
+        demo = next(item for item in review["files"] if item["path"] == "~/demo.txt")
+        self.assertIn({"t": "+", "s": 'CHANGED <img src="https://example.invalid/x">'}, demo["lines"])
+        self.assertIn({"t": "-", "s": "line2"}, demo["lines"])
+        outgoing = self.data("review", "outgoing")["files"][0]
+        self.assertIn({"t": "+", "s": "local addition"}, outgoing["lines"])
+        self.assertEqual(self.read("demo.txt"), "line1\nline2\n")
+
+    def test_pull_requires_the_reviewed_set_and_can_be_undone(self):
+        pending = self.data("fetch")["history"]["sync"]["pending_applications"]
+        stale = self.dash("act", "pull", json.dumps(pending[:1]))
+        self.assertFalse(stale["ok"])
+        self.assertIn("Review them again", stale["error"])
+        self.assertEqual(self.read("demo.txt"), "line1\nline2\n")
+
+        pulled = self.data("act", "pull", json.dumps(pending))
+        self.assertEqual(pulled["state"], "succeeded")
+        self.assertIn("CHANGED", self.read("demo.txt"))
+        self.assertEqual(self.data("snapshot")["last_action"]["action"], "pull")
+
+        self.assertEqual(self.data("act", "undo", pulled["undo"])["state"], "succeeded")
+        self.assertEqual(self.read("demo.txt"), "line1\nline2\n")
+
+    def test_conflicts_block_pull_and_resolve_with_every_side_chosen(self):
+        self.write("clash.txt", "mine\n")
+        self.mise("dot", "save")
+        snapshot = self.data("fetch")
+        pending = snapshot["history"]["sync"]["pending_applications"]
+        self.assertEqual(snapshot["changes"]["conflicts"][0]["path"], "~/clash.txt")
+        self.assertNotIn("~/clash.txt", [item["path"] for item in snapshot["changes"]["incoming"]])
+        self.assertFalse(self.dash("act", "pull", json.dumps(pending))["ok"])
+
+        (conflict,) = self.data("review", "conflicts")["files"]
+        self.assertEqual(conflict["path"], "~/clash.txt")
+        self.assertIn({"t": "-", "s": "mine"}, conflict["lines"])
+
+        wrong = self.dash("act", "resolve", json.dumps({"expected": pending, "choices": {}}))
+        self.assertFalse(wrong["ok"])
+        resolved = self.data("act", "resolve", json.dumps(
+            {"expected": pending, "choices": {"~/clash.txt": "local"}}))
+        self.assertEqual(resolved["state"], "succeeded")
+        self.assertEqual(self.read("clash.txt"), "mine\n")
+        self.assertIn("CHANGED", self.read("demo.txt"))
+
+    def test_publish_is_verified_and_waits_for_incoming_changes(self):
+        pending = self.data("fetch")["history"]["sync"]["pending_applications"]
+        held = self.data("act", "publish")
+        self.assertEqual((held["state"], held["message"]), ("failed", "Pull incoming changes first"))
+        self.data("act", "pull", json.dumps(pending))
+        self.assertEqual(self.data("act", "publish")["state"], "succeeded")
+        self.assertEqual(self.data("snapshot")["changes"]["outgoing"], [])
 
 
 if __name__ == "__main__":
