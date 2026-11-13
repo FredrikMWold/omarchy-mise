@@ -94,6 +94,11 @@ Panel {
     return index > 0 ? text.slice(0, index) : ""
   }
 
+  function folderLabel(path) {
+    var folder = dirName(path)
+    return folder === "~" ? strings.t("path.home") : folder
+  }
+
   function scopeLabel(scope) {
     return ["common", "local", "system", "other"].indexOf(scope) >= 0 ? strings.t("scope." + scope) : scope
   }
@@ -762,6 +767,7 @@ Panel {
 
           Text {
             textFormat: Text.PlainText
+            visible: root.view === "conflicts" || root.reviewTotals.additions > 0
             text: root.view === "conflicts" ? strings.t("legend.remote") : "+" + root.n(root.reviewTotals.additions)
             color: root.accent
             font.family: root.fontFamily
@@ -769,6 +775,7 @@ Panel {
           }
           Text {
             textFormat: Text.PlainText
+            visible: root.view === "conflicts" || root.reviewTotals.deletions > 0
             text: root.view === "conflicts" ? strings.t("legend.local") : "−" + root.n(root.reviewTotals.deletions)
             color: root.urgent
             font.family: root.fontFamily
@@ -1861,7 +1868,7 @@ Panel {
           Text {
             textFormat: Text.PlainText
             Layout.fillWidth: true
-            text: !fileRow.file ? "" : [root.dirName(fileRow.file.path), fileRow.file.reason || ""]
+            text: !fileRow.file ? "" : [root.folderLabel(fileRow.file.path), fileRow.file.reason || ""]
               .filter(function(part) { return part !== "" }).join(" · ")
             visible: text !== ""
             color: root.dim
