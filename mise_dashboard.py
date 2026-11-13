@@ -195,8 +195,22 @@ def parse_patch(text, display=None):
 
 def parse_log(text):
     lines = []
+    script = False
     for raw in clean(text, MAX_OUTPUT).splitlines()[:MAX_LOG_LINES]:
         stripped = raw.strip()
+        # A multi-line hook prints as one quoted `sh -c` script; keep it together.
+        if script:
+            body = stripped[:-1] if stripped.endswith("'") else stripped
+            if body:
+                lines.append({"t": "script", "s": raw.rstrip().rstrip("'")})
+            script = not stripped.endswith("'")
+            continue
+        if stripped.startswith("sh -o errexit -c '") and not stripped.endswith("'"):
+            script = True
+            body = stripped[len("sh -o errexit -c '"):]
+            if body:
+                lines.append({"t": "script", "s": body})
+            continue
         if not stripped:
             continue
         stage = re.match(r"mise bootstrap: (.+)$", stripped)

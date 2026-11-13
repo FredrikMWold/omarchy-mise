@@ -1118,7 +1118,7 @@ Panel {
               y: lineText.y
               visible: modelData.t !== "stage"
               width: Style.space(18)
-              text: modelData.t === "ok" ? "󰄬" : modelData.t === "run" ? "$" : "·"
+              text: modelData.t === "ok" ? "󰄬" : modelData.t === "run" ? "$" : modelData.t === "script" ? "" : "·"
               color: modelData.t === "run" ? root.accent : root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
@@ -1131,7 +1131,7 @@ Panel {
               x: modelData.t === "stage" ? 0 : Style.space(18)
               width: parent.width - x
               text: modelData.t === "stage" ? modelData.s.toUpperCase() : modelData.s
-              color: modelData.t === "stage" || modelData.t === "ok" ? root.dim : root.foreground
+              color: modelData.t === "stage" || modelData.t === "ok" || modelData.t === "script" ? root.dim : root.foreground
               font.family: root.fontFamily
               font.pixelSize: modelData.t === "stage" ? Style.font.caption : Style.font.bodySmall
               font.bold: modelData.t === "stage"

@@ -72,6 +72,13 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual([lines[0]["s"], lines[2]["s"], lines[3]["s"]],
                          ["running bootstrap task", "omarchy plugin add x", "omarchy font set y"])
 
+    def test_bootstrap_log_keeps_multiline_hook_scripts_together(self):
+        lines = parse_log("mise bootstrap: post-repos hooks\nsh -o errexit -c 'set -eu\n\n"
+                          "install_plugin() {\n  id=\"$1\"\n}\ninstall_plugin a b'\nmise bootstrap: dotfiles\n")
+        self.assertEqual([line["t"] for line in lines], ["stage"] + ["script"] * 5 + ["stage"])
+        self.assertEqual([line["s"] for line in lines[1:6]],
+                         ["set -eu", "install_plugin() {", '  id="$1"', "}", "install_plugin a b"])
+
     def test_profiles_come_from_mise_selected_configs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
