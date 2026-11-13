@@ -382,9 +382,18 @@ Panel {
       other: [strings.t("review.other"), strings.t("review.otherCaption")],
       local: [strings.t("review.local"), strings.t("review.localCaption")],
       conflicts: [strings.t("review.conflicts"), strings.t("review.conflictsCaption")],
-      checkpoint: [strings.t("review.checkpoint").arg(viewArg.split(" ")[0]), viewArg.indexOf(" ") > 0 ? viewArg.slice(viewArg.indexOf(" ") + 1) : ""]
+      checkpoint: [strings.t("review.checkpoint").arg(viewArg.split(" ")[0]), checkpointCaption]
     }
     return titles[view] || ["", ""]
+  }
+
+  readonly property string checkpointCaption: {
+    var id = viewArg.split(" ")[0]
+    var path = viewArg.indexOf(" ") > 0 ? viewArg.slice(viewArg.indexOf(" ") + 1) : ""
+    var match = (snapshot ? snapshot.checkpoints : []).filter(function(item) { return String(item.id) === id })[0]
+    var parts = match ? [triggerLabel(match.trigger), relTime(match.created_at)] : []
+    if (path) parts.push(path)
+    return parts.join(" · ")
   }
 
   readonly property var reviewTotals: {
@@ -753,15 +762,15 @@ Panel {
 
           Text {
             textFormat: Text.PlainText
-            text: root.view === "conflicts" ? strings.t("legend.local") : "−" + root.n(root.reviewTotals.deletions)
-            color: root.urgent
+            text: root.view === "conflicts" ? strings.t("legend.remote") : "+" + root.n(root.reviewTotals.additions)
+            color: root.accent
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
           }
           Text {
             textFormat: Text.PlainText
-            text: root.view === "conflicts" ? strings.t("legend.remote") : "+" + root.n(root.reviewTotals.additions)
-            color: root.accent
+            text: root.view === "conflicts" ? strings.t("legend.local") : "−" + root.n(root.reviewTotals.deletions)
+            color: root.urgent
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
           }
@@ -1419,6 +1428,7 @@ Panel {
       font.family: root.fontFamily
       font.pixelSize: Style.font.body
       elide: Text.ElideLeft
+      horizontalAlignment: Text.AlignRight
     }
 
     Text {
