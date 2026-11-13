@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "fredrik.mise",
+  "name": "Mise overview",
+  "version": "1.0.0",
+  "description": "Common and profile dotfiles, incoming changes, and bootstrap previews",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "BarWidget.qml"},
+  "barWidget": {
+    "displayName": "Mise overview",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
