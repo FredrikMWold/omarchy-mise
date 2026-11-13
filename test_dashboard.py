@@ -65,9 +65,12 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(sanitize("\x1b[31mred\x1b[0m\x00"), "red")
 
     def test_bootstrap_log_classifies_stages(self):
-        lines = parse_log("mise bootstrap: system packages\nmise pacman: 17 package(s) already installed\n"
-                          "sh -o errexit -c 'omarchy plugin add x'\nmise repos: cloning y\n")
-        self.assertEqual([line["t"] for line in lines], ["stage", "ok", "run", "info"])
+        lines = parse_log("mise bootstrap: running `bootstrap` task\nmise pacman: 17 package(s) already installed\n"
+                          "sh -o errexit -c 'omarchy plugin add x'\n[bootstrap] $ omarchy font set y\n"
+                          "mise repos: cloning y\n")
+        self.assertEqual([line["t"] for line in lines], ["stage", "ok", "run", "run", "info"])
+        self.assertEqual([lines[0]["s"], lines[2]["s"], lines[3]["s"]],
+                         ["running bootstrap task", "omarchy plugin add x", "omarchy font set y"])
 
     def test_profiles_come_from_mise_selected_configs(self):
         with tempfile.TemporaryDirectory() as directory:

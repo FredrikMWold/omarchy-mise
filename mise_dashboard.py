@@ -63,17 +63,18 @@ def sanitize(value, depth=0):
     return value
 
 
-def run(command, *, env=None, timeout=60, cwd=None):
+def run(command, *, env=None, timeout=60, cwd=None, merge=False):
     with subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd,
-        env=env, stdin=subprocess.DEVNULL, start_new_session=True,
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT if merge else subprocess.PIPE,
+        cwd=cwd, env=env, stdin=subprocess.DEVNULL, start_new_session=True,
     ) as process:
         output = [bytearray(), bytearray()]
         deadline = time.monotonic() + timeout
         try:
             with selectors.DefaultSelector() as selector:
                 selector.register(process.stdout, selectors.EVENT_READ, 0)
-                selector.register(process.stderr, selectors.EVENT_READ, 1)
+                if process.stderr is not None:
+                    selector.register(process.stderr, selectors.EVENT_READ, 1)
                 while selector.get_map():
                     if time.monotonic() >= deadline:
                         raise DashboardError(f"{command[0]} timed out after {timeout}s")
@@ -199,12 +200,15 @@ def parse_log(text):
         if not stripped:
             continue
         stage = re.match(r"mise bootstrap: (.+)$", stripped)
+        wrapped = re.match(r"sh -o errexit -c '(.*)'$", stripped)
+        task = re.match(r"\[[^\]]+\] \$ (.*)$", stripped)
         if stage:
-            lines.append({"t": "stage", "s": stage.group(1)})
+            lines.append({"t": "stage", "s": stage.group(1).replace("`", "")})
         elif re.search(r"already|all (files|tools) are|no changes|up to date", stripped):
             lines.append({"t": "ok", "s": re.sub(r"^mise ", "", stripped)})
-        elif stripped.startswith(("sh -o", "[bootstrap]", "$ ")):
-            lines.append({"t": "run", "s": stripped})
+        elif wrapped or task or stripped.startswith("$ "):
+            command = (wrapped or task).group(1) if (wrapped or task) else stripped[2:]
+            lines.append({"t": "run", "s": command})
         else:
             lines.append({"t": "info", "s": re.sub(r"^mise ", "", stripped)})
     return lines
@@ -220,8 +224,9 @@ class Client:
         self.lazy_tools = set()
         self.state_dir = Path(self.env.get("XDG_STATE_HOME", self.home / ".local/state")) / "omarchy-mise"
 
-    def call(self, *args, timeout=60):
-        return run(self.command + [str(arg) for arg in args], env=self.env, timeout=timeout, cwd=self.home)
+    def call(self, *args, timeout=60, merge=False):
+        return run(self.command + [str(arg) for arg in args], env=self.env, timeout=timeout,
+                   cwd=self.home, merge=merge)
 
     def json(self, *args, timeout=60):
         raw, _ = self.call(*args, timeout=timeout)
@@ -605,8 +610,8 @@ class Client:
         elif kind == "path-history":
             return {"kind": kind, "checkpoints": self.checkpoints(argument, 50)}
         elif kind == "bootstrap":
-            stdout, stderr = self.call("bootstrap", "--dry-run", timeout=180)
-            return {"kind": kind, "log": parse_log(stdout + "\n" + stderr)}
+            output, _ = self.call("bootstrap", "--dry-run", timeout=180, merge=True)
+            return {"kind": kind, "log": parse_log(output)}
         else:
             raise DashboardError("Unknown review")
         return dict(parse_patch(text, self.repo_display), kind=kind)
@@ -696,8 +701,8 @@ class Client:
         bold, dim, reset = "\033[1m", "\033[2m", "\033[0m"
         print(f"{bold}mise bootstrap{reset} {dim}(common + {', '.join(self.active_profiles) or 'no profile'}){reset}\n")
         print(f"{dim}Fresh preview:{reset}")
-        stdout, stderr = self.call("bootstrap", "--dry-run", timeout=180)
-        for line in parse_log(stdout + "\n" + stderr):
+        output, _ = self.call("bootstrap", "--dry-run", timeout=180, merge=True)
+        for line in parse_log(output):
             prefix = {"stage": "\n▸ ", "ok": "  ✓ ", "run": "  $ "}.get(line["t"], "  · ")
             print(prefix + line["s"])
         print(f"\n{dim}Bootstrap may install packages, change services, and run hooks and tasks.{reset}")

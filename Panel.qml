@@ -58,6 +58,10 @@ Panel {
   function n(value) { return Commons.I18n.formatNumber(value) }
   function count(key, value) { return strings.tn(key, value).arg(n(value)) }
 
+  function plain(text) {
+    return String(text).replace(/[\u202f\u00a0]/g, " ")
+  }
+
   function relTime(value) {
     var now = root.clock
     var date = new Date(value)
@@ -66,10 +70,10 @@ Panel {
     if (seconds < 45) return strings.t("time.now")
     if (seconds < 3600) return count("time.minutes", Math.max(1, Math.round(seconds / 60)))
     var locale = Qt.locale(Commons.I18n.formatLocale)
-    var time = date.toLocaleTimeString(locale, Locale.ShortFormat)
+    var time = plain(date.toLocaleTimeString(locale, Locale.ShortFormat))
     if (date.toDateString() === new Date(now).toDateString()) return time
     if (date.toDateString() === new Date(now - 86400000).toDateString()) return strings.t("time.yesterday").arg(time)
-    return date.toLocaleDateString(locale, Locale.ShortFormat)
+    return plain(date.toLocaleDateString(locale, Locale.ShortFormat))
   }
 
   function shortOrigin(url) {
@@ -419,12 +423,15 @@ Panel {
   ShellIpc {
     target: "fredrik.mise.view"
     function open(name: string): void {
-      var views = ["home", "incoming", "outgoing", "other", "local", "conflicts", "dotfiles", "history", "bootstrap", "bootstrapRun", "configs"]
-      if (views.indexOf(name) < 0) return
+      var separator = name.indexOf(":")
+      var target = separator > 0 ? name.slice(0, separator) : name
+      var argument = separator > 0 ? name.slice(separator + 1) : ""
+      var views = ["home", "incoming", "outgoing", "other", "local", "conflicts", "dotfiles", "history", "bootstrap", "bootstrapRun", "configs", "checkpoint", "pathHistory"]
+      if (views.indexOf(target) < 0) return
       if (!root.opened) root.controller.show()
       Qt.callLater(function() {
         root.home()
-        if (name !== "home") root.go(name)
+        if (target !== "home") root.go(target, argument)
       })
     }
   }
@@ -881,7 +888,8 @@ Panel {
 
       ViewHeader {
         title: strings.t("browse.dotfiles")
-        caption: root.count("dotfiles.caption", root.history.tracked_files || 0)
+        caption: root.count("browse.dotfilesCount", root.snapshot ? root.snapshot.dotfiles.length : 0)
+          + " · " + root.count("dotfiles.caption", root.history.tracked_files || 0)
       }
 
       Repeater {
@@ -890,18 +898,17 @@ Panel {
         Section {
           required property var modelData
           title: root.scopeLabel(modelData.scope) + " · " + root.n(modelData.items.length)
+          spacing: Style.space(1)
 
           Repeater {
             model: modelData.items
-            NavRow {
+            PathRow {
               required property var modelData
               readonly property bool attention: ["tracked", "applied", "absent"].indexOf(modelData.state) < 0
-              icon: modelData.files > 1 ? "󰉋" : "󰈙"
-              iconColor: root.dim
-              title: root.baseName(modelData.name)
-              caption: root.dirName(modelData.name) + (modelData.files > 1 ? " · " + root.count("dotfiles.files", modelData.files) : "")
-              trailing: modelData.unsaved ? strings.t("state.unsaved") : attention ? modelData.state : ""
-              trailingColor: attention ? root.urgent : root.accent
+              path: modelData.name
+              detail: modelData.unsaved ? strings.t("state.unsaved") : attention ? modelData.state
+                : modelData.files > 1 ? root.count("dotfiles.files", modelData.files) : ""
+              detailColor: attention ? root.urgent : modelData.unsaved ? root.accent : root.dim
               onTriggered: root.go("pathHistory", modelData.name)
             }
           }
@@ -945,7 +952,8 @@ Panel {
             required property var modelData
             icon: root.triggerIcon(modelData.trigger)
             iconColor: modelData.trigger === "apply" ? root.accent : root.dim
-            title: modelData.description || root.triggerLabel(modelData.trigger)
+            title: modelData.operation === "apply" && modelData.affected > 0 ? root.count("history.pulled", modelData.affected)
+              : modelData.description || root.triggerLabel(modelData.trigger)
             caption: "#" + modelData.id + " · " + root.triggerLabel(modelData.trigger) + " · " + root.relTime(modelData.created_at)
               + (modelData.affected > 0 ? " · " + root.count("dotfiles.files", modelData.affected) : "")
             onTriggered: root.go("checkpoint", modelData.id + (root.view === "pathHistory" ? " " + root.viewArg : ""))
@@ -1086,7 +1094,7 @@ Panel {
 
             Text {
               textFormat: Text.PlainText
-              anchors.bottom: parent.bottom
+              y: lineText.y
               visible: modelData.t !== "stage"
               width: Style.space(18)
               text: modelData.t === "ok" ? "󰄬" : modelData.t === "run" ? "$" : "·"
@@ -1098,7 +1106,7 @@ Panel {
             Text {
               id: lineText
               textFormat: Text.PlainText
-              anchors.bottom: parent.bottom
+              y: parent.height - implicitHeight
               x: modelData.t === "stage" ? 0 : Style.space(18)
               width: parent.width - x
               text: modelData.t === "stage" ? modelData.s.toUpperCase() : modelData.s
@@ -1376,6 +1384,81 @@ Panel {
     }
   }
 
+  component PathRow: CursorSurface {
+    id: pathRow
+    property string path: ""
+    property string detail: ""
+    property color detailColor: root.dim
+    property bool cursorTarget: true
+    property bool drillable: true
+    signal triggered()
+    function activate() { pathRow.triggered() }
+
+    readonly property string folder: root.dirName(path)
+    hasCursor: root.cursorActive && root.cursorItem === pathRow
+    foreground: root.foreground
+    width: parent ? parent.width : 0
+    implicitHeight: nameText.implicitHeight + Style.space(12)
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.setCursor(pathRow)
+      onClicked: pathRow.activate()
+    }
+
+    Text {
+      id: folderText
+      textFormat: Text.PlainText
+      x: Style.space(10)
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.min(implicitWidth, Math.max(0, detailText.x - x - nameText.implicitWidth - Style.space(12)))
+      text: pathRow.folder !== "" ? pathRow.folder + "/" : ""
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      elide: Text.ElideLeft
+    }
+
+    Text {
+      id: nameText
+      textFormat: Text.PlainText
+      anchors.left: folderText.right
+      anchors.verticalCenter: parent.verticalCenter
+      width: Math.min(implicitWidth, Math.max(0, detailText.x - x - Style.space(12)))
+      text: root.baseName(pathRow.path)
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      elide: Text.ElideRight
+    }
+
+    Text {
+      id: detailText
+      textFormat: Text.PlainText
+      anchors.right: chevron.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      text: pathRow.detail
+      color: pathRow.detailColor
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+
+    Text {
+      id: chevron
+      textFormat: Text.PlainText
+      anchors.right: parent.right
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      text: "󰅂"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+  }
+
   component ToggleRow: CursorSurface {
     id: toggleRow
     property string title: ""
@@ -1548,7 +1631,7 @@ Panel {
       id: scopeText
       textFormat: Text.PlainText
       anchors.centerIn: parent
-      text: root.scopeLabel(scopeTag.scope)
+      text: scopeTag.scope
       color: scopeTag.profile ? root.accent : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

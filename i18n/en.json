@@ -49,7 +49,7 @@
   "row.bootstrap": {"one": "%1 bootstrap change", "other": "%1 bootstrap changes"},
   "row.bootstrapCaption": "Packages, tools, or services differ from your config",
   "row.declarations": "Config changed since last bootstrap",
-  "row.declarationsCaption": "Everything matches; bootstrap would re-run hooks and tasks",
+  "row.declarationsCaption": "Nothing differs · a run repeats hooks and tasks",
   "row.other": {"one": "%1 change on other profiles", "other": "%1 changes on other profiles"},
 
   "sync.origin": "Origin",
@@ -65,7 +65,7 @@
   "capture.running": "Running",
   "capture.stopped": "Stopped",
   "auto.title": "Check origin automatically",
-  "auto.caption": "Every 5 minutes. Only fetches; never pulls or publishes.",
+  "auto.caption": "Every 5 minutes · fetch only, never writes",
 
   "browse.dotfiles": "Dotfiles",
   "browse.dotfilesCount": {"one": "%1 entry", "other": "%1 entries"},
@@ -143,6 +143,7 @@
 
   "history.pathCaption": "Checkpoints that changed %1",
   "history.empty": "No checkpoints yet",
+  "history.pulled": {"one": "Pulled %1 change", "other": "Pulled %1 changes"},
   "trigger.apply": "Pulled",
   "trigger.bootstrap": "Bootstrap",
   "trigger.undo": "Undo",
