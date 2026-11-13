@@ -82,21 +82,27 @@ class ParsingTests(unittest.TestCase):
     def test_profiles_come_from_mise_selected_configs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            common, profile, system = root / "config.toml", root / "config.train.toml", root / "tools.toml"
+            (root / "etc").mkdir()
+            common, profile, system = root / "config.toml", root / "config.train.toml", root / "etc/tools.toml"
             common.write_text('[tools]\nnode = "latest"\n')
             profile.write_text('[bootstrap.repos]\n"~/work" = {url = "https://example.invalid/repo"}\n')
             system.write_text('[tools]\nnode = {version = "latest", lazy = true}\namp = {version = "latest", lazy = true}\n')
             client = Client()
+            client.system_dirs = (str(root / "etc") + "/",)
             client.json = lambda *args, **kwargs: [{"path": str(profile)}, {"path": str(common)}, {"path": str(system)}]
             configs, origins = client.sources()
             self.assertEqual(client.active_profiles, ["train"])
+            self.assertEqual([item["scope"] for item in configs], ["train", "common"])
             self.assertEqual(origins[("tool", "node")][0], "common")
             self.assertEqual(origins[("repo", "~/work")][0], "train")
             rows = client.bootstrap_rows({"tools": [
                 {"tool": "node", "state": "missing", "requested_version": "latest"},
                 {"tool": "amp", "state": "missing", "requested_version": "latest"},
+                {"tool": "undeclared", "state": "installed", "requested_version": "1"},
             ]}, {"resources": []}, origins)
-            self.assertEqual([row["state"] for row in rows], ["pending", "on-demand"])
+            # node is declared by common config too, so it stays; amp exists only in the defaults.
+            self.assertEqual([(row["name"], row["state"], row["scope"]) for row in rows],
+                             [("node", "pending", "common"), ("undeclared", "ok", "")])
             self.assertNotIn("-E", client.command)
 
 

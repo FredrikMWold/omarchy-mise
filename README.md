@@ -15,8 +15,8 @@ labelled with the scope it came from, so the same plugin works on any machine.
   failures. Right-click checks origin; middle-click re-reads local state.
 - **Changes:** conflicts, incoming changes, changes to publish, unsaved edits,
   bootstrap drift, and changes on other profiles, each opening a per-file diff.
-- **Sync:** origin, branch and mode, last pull and publish, automatic capture,
-  and the automatic origin check toggle.
+- **Sync:** origin, branch, mise's sync mode, last pull and publish, and
+  automatic capture.
 - **Browse:** tracked dotfiles by scope with per-file history, bootstrap
   resources grouped by kind, the checkpoint history with diffs, and the config
   files mise loaded.
@@ -31,8 +31,11 @@ labelled with the scope it came from, so the same plugin works on any machine.
 | Undo a pull | In the panel | Confirmation; only for the pull just made |
 | Bootstrap | In a terminal | Fresh dry run, then asks before running |
 
-Origin checks run `mise dot sync --fetch-only` every five minutes when enabled
-(on by default). They never write files or push.
+Background syncing is mise's own: with the default `history.sync = "sync"`, the
+history watcher pushes saved checkpoints, fetches every `history.fetch_interval`,
+and applies incoming changes when nothing conflicts. The panel shows the mode,
+offers a one-off check (`mise dot sync --fetch-only`), and handles whatever
+mise holds back, such as conflicts. It runs no sync timer of its own.
 
 ## Keyboard
 
@@ -49,12 +52,11 @@ Views: `home`, `incoming`, `outgoing`, `conflicts`, `local`, `other`,
 `dotfiles`, `history`, `bootstrap`, `bootstrapRun`, `configs`,
 `checkpoint:<id>`, `pathHistory:<~/path>`.
 
-## Settings
-
-`autoFetch` (default `true`) in the widget's `shell.json` entry, also toggled
-from the panel.
-
 ## Development
+
+Omarchy's package-managed `/etc/mise/conf.d` defaults are loaded for
+precedence but not listed, and their on-demand tools are left out.
+
 
 `mise_dashboard.py` is the bounded adapter between the panel and mise. Diffs
 against origin come from read-only `git` on mise's local history repository

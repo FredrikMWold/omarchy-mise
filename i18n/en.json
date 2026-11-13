@@ -3,17 +3,29 @@
   "bar.title": "Mise",
   "bar.problem": "needs attention",
   "bar.inSync": "Mise · everything in sync",
-
-  "count.conflicts": {"one": "%1 conflict", "other": "%1 conflicts"},
-  "count.incoming": {"one": "%1 incoming", "other": "%1 incoming"},
-  "count.bootstrap": {"one": "%1 bootstrap change", "other": "%1 bootstrap changes"},
-  "count.outgoing": {"one": "%1 to publish", "other": "%1 to publish"},
-
+  "count.conflicts": {
+    "one": "%1 conflict",
+    "other": "%1 conflicts"
+  },
+  "count.incoming": {
+    "one": "%1 incoming",
+    "other": "%1 incoming"
+  },
+  "count.bootstrap": {
+    "one": "%1 bootstrap change",
+    "other": "%1 bootstrap changes"
+  },
+  "count.outgoing": {
+    "one": "%1 to publish",
+    "other": "%1 to publish"
+  },
   "time.never": "Never",
   "time.now": "Just now",
-  "time.minutes": {"one": "%1 min ago", "other": "%1 min ago"},
+  "time.minutes": {
+    "one": "%1 min ago",
+    "other": "%1 min ago"
+  },
   "time.yesterday": "Yesterday %1",
-
   "scope.common": "Common",
   "scope.local": "Local",
   "scope.system": "System",
@@ -26,61 +38,100 @@
   "back": "Back",
   "dismiss": "Dismiss",
   "loading": "Loading…",
-
   "hero.loading": "Reading mise state",
   "hero.inSync": "Everything in sync",
   "hero.problem": "Something needs a look",
-  "hero.conflicts": {"one": "%1 conflict to resolve", "other": "%1 conflicts to resolve"},
-  "hero.incoming": {"one": "%1 incoming change", "other": "%1 incoming changes"},
-  "hero.bootstrap": {"one": "%1 bootstrap change", "other": "%1 bootstrap changes"},
-  "hero.outgoing": {"one": "%1 change to publish", "other": "%1 changes to publish"},
+  "hero.conflicts": {
+    "one": "%1 conflict to resolve",
+    "other": "%1 conflicts to resolve"
+  },
+  "hero.incoming": {
+    "one": "%1 incoming change",
+    "other": "%1 incoming changes"
+  },
+  "hero.bootstrap": {
+    "one": "%1 bootstrap change",
+    "other": "%1 bootstrap changes"
+  },
+  "hero.outgoing": {
+    "one": "%1 change to publish",
+    "other": "%1 changes to publish"
+  },
   "hero.checking": "Checking origin…",
   "hero.checked": "Checked %1",
   "hero.checkTooltip": "Check origin now (R)",
-
   "section.changes": "Changes",
   "section.sync": "Sync",
   "section.browse": "Browse",
-
-  "row.conflicts": {"one": "%1 conflict", "other": "%1 conflicts"},
-  "row.incoming": {"one": "%1 incoming change", "other": "%1 incoming changes"},
-  "row.outgoing": {"one": "%1 change to publish", "other": "%1 changes to publish"},
-  "row.unsaved": {"one": "%1 unsaved edit", "other": "%1 unsaved edits"},
+  "row.conflicts": {
+    "one": "%1 conflict",
+    "other": "%1 conflicts"
+  },
+  "row.incoming": {
+    "one": "%1 incoming change",
+    "other": "%1 incoming changes"
+  },
+  "row.outgoing": {
+    "one": "%1 change to publish",
+    "other": "%1 changes to publish"
+  },
+  "row.unsaved": {
+    "one": "%1 unsaved edit",
+    "other": "%1 unsaved edits"
+  },
   "row.unsavedCaption": "Automatic capture saves these shortly",
-  "row.bootstrap": {"one": "%1 bootstrap change", "other": "%1 bootstrap changes"},
+  "row.bootstrap": {
+    "one": "%1 bootstrap change",
+    "other": "%1 bootstrap changes"
+  },
   "row.bootstrapCaption": "Packages, tools, or services differ from your config",
   "row.declarations": "Config changed since last bootstrap",
   "row.declarationsCaption": "Nothing differs · a run repeats hooks and tasks",
-  "row.other": {"one": "%1 change on other profiles", "other": "%1 changes on other profiles"},
-
+  "row.other": {
+    "one": "%1 change on other profiles",
+    "other": "%1 changes on other profiles"
+  },
   "sync.origin": "Origin",
   "sync.noOrigin": "Not connected",
   "sync.branch": "Branch",
-  "sync.branchMode": "%1 · %2",
   "sync.pulled": "Last pulled",
   "sync.published": "Last published",
   "sync.capture": "Automatic capture",
-  "mode.manual": "manual sync",
-  "mode.sync": "automatic sync",
-  "mode.fetch-only": "fetch only",
+  "mode.manual": "Manual",
+  "mode.sync": "Syncs automatically",
+  "mode.fetch-only": "Fetches automatically",
   "capture.running": "Running",
   "capture.stopped": "Stopped",
-  "auto.title": "Check origin automatically",
-  "auto.caption": "Every 5 minutes · fetch only, never writes",
-
   "browse.dotfiles": "Dotfiles",
-  "browse.dotfilesCount": {"one": "%1 entry", "other": "%1 entries"},
+  "browse.dotfilesCount": {
+    "one": "%1 entry",
+    "other": "%1 entries"
+  },
   "browse.bootstrap": "Bootstrap",
   "browse.nothingDeclared": "Nothing declared",
-  "browse.pending": {"one": "%1 change pending", "other": "%1 changes pending"},
-  "browse.matching": {"one": "%1 matches", "other": "%1 match"},
-  "browse.onDemand": {"one": "%1 on demand", "other": "%1 on demand"},
+  "browse.pending": {
+    "one": "%1 change pending",
+    "other": "%1 changes pending"
+  },
+  "browse.matching": {
+    "one": "%1 matches",
+    "other": "%1 match"
+  },
+  "browse.onDemand": {
+    "one": "%1 on demand",
+    "other": "%1 on demand"
+  },
   "browse.history": "History",
-  "browse.checkpoints": {"one": "%1 checkpoint", "other": "%1 checkpoints"},
+  "browse.checkpoints": {
+    "one": "%1 checkpoint",
+    "other": "%1 checkpoints"
+  },
   "browse.latest": "latest %1",
   "browse.config": "Configuration",
-  "browse.configFiles": {"one": "%1 file", "other": "%1 files"},
-
+  "browse.configFiles": {
+    "one": "%1 file",
+    "other": "%1 files"
+  },
   "review.incoming": "Incoming changes",
   "review.incomingCaption": "From origin · fetched %1",
   "review.outgoing": "Changes to publish",
@@ -93,25 +144,37 @@
   "review.conflictsCaption": "Changed here and on origin",
   "review.checkpoint": "Checkpoint #%1",
   "review.empty": "No differences",
-  "review.files": {"one": "%1 file", "other": "%1 files"},
-  "review.hidden": {"one": "%1 internal mise file not shown", "other": "%1 internal mise files not shown"},
+  "review.files": {
+    "one": "%1 file",
+    "other": "%1 files"
+  },
+  "review.hidden": {
+    "one": "%1 internal mise file not shown",
+    "other": "%1 internal mise files not shown"
+  },
   "legend.local": "− this machine",
   "legend.remote": "+ origin",
-
-  "hold.conflicts": {"one": "Resolve the conflict before pulling.", "other": "Resolve the %1 conflicts before pulling."},
+  "hold.conflicts": {
+    "one": "Resolve the conflict before pulling.",
+    "other": "Resolve the %1 conflicts before pulling."
+  },
   "hold.pullFirst": "Origin has changes you haven't pulled. mise publishes once both histories are reconciled, so pull first.",
-  "hold.resolveAlsoPulls": {"one": "Pick a version for each file. Resolving also pulls %1 other incoming change.", "other": "Pick a version for each file. Resolving also pulls %1 other incoming changes."},
+  "hold.resolveAlsoPulls": {
+    "one": "Pick a version for each file. Resolving also pulls %1 other incoming change.",
+    "other": "Pick a version for each file. Resolving also pulls %1 other incoming changes."
+  },
   "hold.choose": "Pick a version for each file.",
   "hold.undoable": "mise saves a checkpoint first, so a pull can be undone.",
-
   "conflict.keepLocal": "Keep this machine's",
   "conflict.takeRemote": "Take origin's",
-
   "confirmButton.pull": "Pull",
   "confirmButton.resolve": "Resolve",
   "confirmButton.publish": "Publish",
   "confirmButton.undo": "Undo",
-  "action.pullCount": {"one": "Pull %1 change", "other": "Pull %1 changes"},
+  "action.pullCount": {
+    "one": "Pull %1 change",
+    "other": "Pull %1 changes"
+  },
   "action.publish": "Publish",
   "action.resolve": "Resolve and pull",
   "action.undo": "Undo",
@@ -119,19 +182,26 @@
   "action.reviewIncoming": "Review incoming",
   "action.previewRun": "Preview run",
   "action.runTerminal": "Run in terminal",
-
-  "confirm.pull": {"one": "Write %1 incoming change to this machine?", "other": "Write %1 incoming changes to this machine?"},
+  "confirm.pull": {
+    "one": "Write %1 incoming change to this machine?",
+    "other": "Write %1 incoming changes to this machine?"
+  },
   "confirm.resolve": "Apply the versions you picked?",
-  "confirm.resolveAndPull": {"one": "Apply the versions you picked and pull %1 other incoming change?", "other": "Apply the versions you picked and pull %1 other incoming changes?"},
+  "confirm.resolveAndPull": {
+    "one": "Apply the versions you picked and pull %1 other incoming change?",
+    "other": "Apply the versions you picked and pull %1 other incoming changes?"
+  },
   "confirm.publish": "Push your saved history to %1?",
   "confirm.undo": "Restore the files this pull changed?",
-
   "result.running.pull": "Pulling…",
   "result.running.resolve": "Resolving conflicts…",
   "result.running.publish": "Publishing…",
   "result.running.undo": "Undoing pull…",
   "result.running.bootstrap": "Bootstrap is running in a terminal",
-  "result.pulled": {"one": "Pulled %1 change", "other": "Pulled %1 changes"},
+  "result.pulled": {
+    "one": "Pulled %1 change",
+    "other": "Pulled %1 changes"
+  },
   "result.pull.failed": "Pull failed",
   "result.resolve.succeeded": "Conflicts resolved",
   "result.resolve.failed": "Couldn't resolve conflicts",
@@ -141,14 +211,21 @@
   "result.undo.failed": "Undo failed",
   "result.bootstrap.succeeded": "Bootstrap finished",
   "result.bootstrap.failed": "Bootstrap failed",
-
-  "dotfiles.caption": {"one": "%1 tracked file", "other": "%1 tracked files"},
-  "dotfiles.files": {"one": "%1 file", "other": "%1 files"},
+  "dotfiles.caption": {
+    "one": "%1 tracked file",
+    "other": "%1 tracked files"
+  },
+  "dotfiles.files": {
+    "one": "%1 file",
+    "other": "%1 files"
+  },
   "state.unsaved": "unsaved",
-
   "history.pathCaption": "Checkpoints that changed %1",
   "history.empty": "No checkpoints yet",
-  "history.pulled": {"one": "Pulled %1 change", "other": "Pulled %1 changes"},
+  "history.pulled": {
+    "one": "Pulled %1 change",
+    "other": "Pulled %1 changes"
+  },
   "trigger.apply": "Pulled",
   "trigger.bootstrap": "Bootstrap",
   "trigger.undo": "Undo",
@@ -156,16 +233,26 @@
   "trigger.save": "Saved",
   "trigger.edit": "Edit",
   "trigger.agent": "Agent",
-
-  "bootstrap.pending": {"one": "%1 change pending", "other": "%1 changes pending"},
-  "bootstrap.allMatch": {"one": "%1 resource matches your config", "other": "All %1 resources match your config"},
-  "bootstrap.onDemand": {"one": "%1 tool installs on first use", "other": "%1 tools install on first use"},
-  "bootstrap.always": {"one": "%1 step runs every time", "other": "%1 steps run every time"},
+  "bootstrap.pending": {
+    "one": "%1 change pending",
+    "other": "%1 changes pending"
+  },
+  "bootstrap.allMatch": {
+    "one": "%1 resource matches your config",
+    "other": "All %1 resources match your config"
+  },
+  "bootstrap.onDemand": {
+    "one": "%1 tool installs on first use",
+    "other": "%1 tools install on first use"
+  },
+  "bootstrap.always": {
+    "one": "%1 step runs every time",
+    "other": "%1 steps run every time"
+  },
   "bootstrap.declarations": "Your config changed since the last bootstrap. Nothing differs, but running it again re-runs hooks and the bootstrap task.",
   "bootstrap.showAll": "Show matching resources",
   "bootstrap.showAllCaption": "Off shows only what would change or always runs",
   "bootstrap.ofTotal": "%1 of %2",
-
   "kind.package": "Packages",
   "kind.tool": "Tools",
   "kind.repo": "Repositories",
@@ -178,28 +265,51 @@
   "kind.login_shell": "Login shell",
   "kind.hook": "Hooks",
   "kind.task": "Tasks",
-
   "resource.always": "Runs every bootstrap",
   "resource.onDemand": "Installs on first use",
   "resource.change": "%1 → %2",
-
   "run.title": "Bootstrap preview",
   "run.caption": "Dry run · nothing was changed",
   "run.loading": "Running a dry run…",
   "run.terminalNote": "Bootstrap can install packages and ask for your password, so it runs in a terminal. It shows a fresh preview and asks before changing anything.",
-
   "config.caption": "What mise loaded on this machine, highest precedence first",
   "config.settingsOnly": "Settings only",
-  "config.count.tool": {"one": "%1 tool", "other": "%1 tools"},
-  "config.count.repo": {"one": "%1 repo", "other": "%1 repos"},
-  "config.count.package": {"one": "%1 package", "other": "%1 packages"},
-  "config.count.service": {"one": "%1 service", "other": "%1 services"},
-  "config.count.hook": {"one": "%1 hook", "other": "%1 hooks"},
-  "config.count.dotfile": {"one": "%1 dotfile", "other": "%1 dotfiles"},
-  "config.count.task": {"one": "%1 bootstrap task", "other": "%1 bootstrap tasks"},
-
+  "config.count.tool": {
+    "one": "%1 tool",
+    "other": "%1 tools"
+  },
+  "config.count.repo": {
+    "one": "%1 repo",
+    "other": "%1 repos"
+  },
+  "config.count.package": {
+    "one": "%1 package",
+    "other": "%1 packages"
+  },
+  "config.count.service": {
+    "one": "%1 service",
+    "other": "%1 services"
+  },
+  "config.count.hook": {
+    "one": "%1 hook",
+    "other": "%1 hooks"
+  },
+  "config.count.dotfile": {
+    "one": "%1 dotfile",
+    "other": "%1 dotfiles"
+  },
+  "config.count.task": {
+    "one": "%1 bootstrap task",
+    "other": "%1 bootstrap tasks"
+  },
   "diff.binary": "binary",
   "diff.binaryNote": "Binary file · no preview",
   "diff.noPreview": "No line changes to show",
-  "diff.omitted": {"one": "%1 more line not shown", "other": "%1 more lines not shown"}
+  "diff.omitted": {
+    "one": "%1 more line not shown",
+    "other": "%1 more lines not shown"
+  },
+  "sync.mode": "Mode",
+  "mode.fetch-onlyEvery": "Fetches every %1",
+  "mode.syncEvery": "Syncs every %1"
 }

@@ -236,6 +236,8 @@ class Client:
         self.command = ["mise", "-C", str(self.home)]
         self.active_profiles = []
         self.lazy_tools = set()
+        # Package-managed defaults (Omarchy's /etc/mise/conf.d) load for precedence but stay hidden.
+        self.system_dirs = ("/etc/",)
         self.state_dir = Path(self.env.get("XDG_STATE_HOME", self.home / ".local/state")) / "omarchy-mise"
 
     def call(self, *args, timeout=60, merge=False):
@@ -261,7 +263,7 @@ class Client:
         match = re.fullmatch(r"(?:config|mise)\.([A-Za-z0-9_-]+)\.toml", name)
         if match:
             return match.group(1)
-        if str(config).startswith("/etc/"):
+        if str(config).startswith(self.system_dirs):
             return "system"
         return "common"
 
@@ -312,7 +314,8 @@ class Client:
             if "bootstrap" in config.get("tasks", {}):
                 counts["task"] = 1
                 declarations.setdefault(("task", "bootstrap"), (scope, str(path)))
-            configs.append({"name": self.tilde(path), "scope": scope, "counts": counts})
+            if scope != "system":
+                configs.append({"name": self.tilde(path), "scope": scope, "counts": counts})
             for kind, table in tables.items():
                 if not isinstance(table, dict):
                     continue
@@ -339,7 +342,7 @@ class Client:
             result.append({
                 "kind": source_kind, "name": clean(name, 2048),
                 "current": clean(current, 2048), "desired": clean(desired, 2048),
-                "action": action, "state": state, "scope": scope or "system",
+                "action": action, "state": state, "scope": scope or "",
                 "config": self.tilde(clean(config or "", 2048)),
             })
 
@@ -383,7 +386,7 @@ class Client:
         if isinstance(shell, dict):
             append("login_shell", "login shell", shell.get("current", ""),
                    shell.get("desired", ""), shell.get("action", "unknown"))
-        return rows(result, "dashboard resources")
+        return rows([row for row in result if row["scope"] != "system"], "dashboard resources")
 
     # History repository -----------------------------------------------------------
 
@@ -533,6 +536,8 @@ class Client:
         checkpoints = collect("History", lambda: self.checkpoints())
         if checkpoints is not None:
             data["checkpoints"] = checkpoints
+        data["fetch_interval"] = collect("Settings", lambda: first_line(
+            self.call("settings", "get", "history.fetch_interval")[0]))
         result_path = self.state_dir / "last-action.json"
         if result_path.exists():
             def read_result():

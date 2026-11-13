@@ -101,6 +101,12 @@ Panel {
     return folder === "~" ? strings.t("path.home") : folder
   }
 
+  function modeLabel(mode) {
+    var key = "mode." + mode
+    var label = strings.t(key)
+    return label === key ? String(mode || strings.t("none")) : label
+  }
+
   function scopeLabel(scope) {
     return ["common", "local", "system", "other"].indexOf(scope) >= 0 ? strings.t("scope." + scope) : scope
   }
@@ -670,9 +676,12 @@ Panel {
           spacing: Style.space(5)
 
           InfoPair { label: strings.t("sync.origin"); value: root.shortOrigin(root.sync.origin) }
+          InfoPair { label: strings.t("sync.branch"); value: root.sync.branch || strings.t("none") }
           InfoPair {
-            label: strings.t("sync.branch")
-            value: root.sync.branch ? strings.t("sync.branchMode").arg(root.sync.branch).arg(strings.t("mode." + root.sync.mode)) : strings.t("none")
+            label: strings.t("sync.mode")
+            value: root.sync.mode !== "manual" && root.snapshot && root.snapshot.fetch_interval
+              ? strings.t("mode." + root.sync.mode + "Every").arg(root.snapshot.fetch_interval)
+              : root.modeLabel(root.sync.mode)
           }
           InfoPair { label: strings.t("sync.pulled"); value: root.relTime(root.sync.last_apply) }
           InfoPair { label: strings.t("sync.published"); value: root.relTime(root.sync.last_publish) }
@@ -681,13 +690,6 @@ Panel {
             value: root.history.watcher === "running" ? strings.t("capture.running") : strings.t("capture.stopped")
             valueColor: root.history.watcher === "running" ? root.foreground : root.urgent
           }
-        }
-
-        ToggleRow {
-          title: strings.t("auto.title")
-          caption: strings.t("auto.caption")
-          checked: Dashboard.autoFetch
-          onToggled: Dashboard.setAutoFetch(!Dashboard.autoFetch)
         }
       }
 

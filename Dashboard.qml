@@ -10,7 +10,6 @@ Item {
   id: root
 
   property var snapshot: null
-  property bool autoFetch: true
   property bool configured: false
   property string errorMessage: ""
   property string fetchError: ""
@@ -69,10 +68,9 @@ Item {
   }
 
   function configure(settings) {
-    autoFetch = !settings || settings.autoFetch !== false
     if (configured) return
     configured = true
-    run(autoFetch ? "fetch" : "snapshot")
+    run("snapshot")
   }
 
   function run(command) {
@@ -125,11 +123,6 @@ Item {
 
   function dismissAction() { if (recentAction) dismissedAt = recentAction.at }
 
-  function setAutoFetch(enabled) {
-    autoFetch = enabled
-    settingsProcess.command = ["omarchy", "bar", "set", "fredrik.mise", "autoFetch", enabled ? "true" : "false", "--json"]
-    settingsProcess.running = true
-  }
 
   function parse(text) {
     var payload = JSON.parse(text)
@@ -201,15 +194,7 @@ Item {
     }
   }
 
-  Process {
-    id: settingsProcess
-    stderr: StdioCollector { id: settingsErrors }
-    onExited: function(code) {
-      if (code !== 0) root.errorMessage = settingsErrors.text || "Could not save the setting"
-    }
-  }
-
-  // Local state is cheap to re-read; reaching origin is not, so it is paced.
+  // mise's history watcher fetches origin per `history.sync`; this only re-reads local state.
   Timer {
     interval: 60000
     running: root.configured
@@ -217,19 +202,12 @@ Item {
     onTriggered: if (!root.busy && root.acting === "") root.refresh()
   }
 
-  Timer {
-    interval: 300000
-    running: root.configured && root.autoFetch
-    repeat: true
-    onTriggered: if (!root.busy && root.acting === "") root.fetch()
-  }
-
   IpcHandler {
     target: "fredrik.mise.control"
     function refresh(): void { root.refresh() }
     function fetch(): void { root.fetch() }
     function state(): string {
-      return JSON.stringify({ busy: root.busy, autoFetch: root.autoFetch, severity: root.severity,
+      return JSON.stringify({ busy: root.busy, severity: root.severity,
         reviewCount: root.reviewCount, problems: root.problems, acting: root.acting,
         profiles: root.snapshot ? root.snapshot.profiles : null })
     }
