@@ -266,7 +266,7 @@ Panel {
   }
 
   function pull() {
-    ask(count("confirm.pull", Dashboard.incomingCount), strings.t("action.pull"), function() {
+    ask(count("confirm.pull", Dashboard.incomingCount), strings.t("confirmButton.pull"), function() {
       Dashboard.act("pull", JSON.stringify(root.sync.pending_applications || []))
       root.home()
     })
@@ -275,21 +275,21 @@ Panel {
   function resolve() {
     var others = Dashboard.incomingCount
     var message = others > 0 ? count("confirm.resolveAndPull", others) : strings.t("confirm.resolve")
-    ask(message, strings.t("action.resolve"), function() {
+    ask(message, strings.t("confirmButton.resolve"), function() {
       Dashboard.act("resolve", JSON.stringify({ expected: root.sync.pending_applications || [], choices: root.choices }))
       root.home()
     })
   }
 
   function publish() {
-    ask(strings.t("confirm.publish").arg(shortOrigin(sync.origin)), strings.t("action.publish"), function() {
+    ask(strings.t("confirm.publish").arg(shortOrigin(sync.origin)), strings.t("confirmButton.publish"), function() {
       Dashboard.act("publish")
       root.home()
     })
   }
 
   function undo(id) {
-    ask(strings.t("confirm.undo"), strings.t("action.undo"), function() { Dashboard.act("undo", String(id)) })
+    ask(strings.t("confirm.undo"), strings.t("confirmButton.undo"), function() { Dashboard.act("undo", String(id)) })
   }
 
   function runBootstrap() {
@@ -705,7 +705,8 @@ Panel {
         NavRow {
           icon: "󰏗"
           title: strings.t("browse.bootstrap")
-          caption: Dashboard.bootstrapPending > 0 ? root.count("browse.pending", Dashboard.bootstrapPending)
+          caption: Dashboard.resources.length === 0 ? strings.t("browse.nothingDeclared")
+            : Dashboard.bootstrapPending > 0 ? root.count("browse.pending", Dashboard.bootstrapPending)
             : root.count("browse.matching", root.resourcesMatching)
               + (root.resourcesOnDemand > 0 ? " · " + root.count("browse.onDemand", root.resourcesOnDemand) : "")
           onTriggered: root.go("bootstrap")
@@ -1688,20 +1689,38 @@ Panel {
       anchors.rightMargin: Style.space(6)
       spacing: Style.space(10)
 
-      Text {
-        id: bannerIcon
-        textFormat: Text.PlainText
-        text: !banner.info ? "" : banner.info.running ? "󰑐" : banner.info.ok ? "󰗠" : "󰀨"
-        color: banner.tint
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.icon
+      Item {
+        implicitWidth: Math.max(statusGlyph.implicitWidth, spinnerGlyph.implicitWidth)
+        implicitHeight: Math.max(statusGlyph.implicitHeight, spinnerGlyph.implicitHeight)
         Layout.alignment: Qt.AlignVCenter
-        RotationAnimation on rotation {
-          from: 0
-          to: 360
-          duration: Style.duration(900)
-          loops: Animation.Infinite
-          running: !!banner.info && banner.info.running && !Style.reduceMotion
+
+        Text {
+          id: statusGlyph
+          textFormat: Text.PlainText
+          anchors.centerIn: parent
+          visible: !!banner.info && !banner.info.running
+          text: !banner.info ? "" : banner.info.ok ? "󰗠" : "󰀨"
+          color: banner.tint
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.icon
+        }
+
+        Text {
+          id: spinnerGlyph
+          textFormat: Text.PlainText
+          anchors.centerIn: parent
+          visible: !!banner.info && banner.info.running
+          text: "󰑐"
+          color: banner.tint
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.icon
+          RotationAnimation on rotation {
+            from: 0
+            to: 360
+            duration: Style.duration(900)
+            loops: Animation.Infinite
+            running: spinnerGlyph.visible && !Style.reduceMotion
+          }
         }
       }
 
