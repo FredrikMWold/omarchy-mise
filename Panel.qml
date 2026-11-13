@@ -291,7 +291,8 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            Flow {
+            Row {
+              id: countsRow
               width: parent.width
               spacing: Style.space(8)
               Repeater {
@@ -315,7 +316,7 @@ Panel {
                 ]
                 Rectangle {
                   required property var modelData
-                  width: (parent.width - Style.space(24)) / 4
+                  width: Math.floor((countsRow.width - countsRow.spacing * 3) / 4)
                   height: Style.space(68)
                   radius: Style.cornerRadius
                   color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.06)
