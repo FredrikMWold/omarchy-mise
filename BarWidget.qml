@@ -10,8 +10,6 @@ BarWidget {
 
   Commons.Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
 
-  readonly property string countText: Dashboard.reviewCount > 0 && !vertical
-    ? Commons.I18n.formatNumber(Dashboard.reviewCount) : ""
   readonly property string summary: {
     if (!Dashboard.snapshot) return strings.t("bar.loading")
     var parts = []
@@ -52,22 +50,51 @@ BarWidget {
     }
   }
 
-  TextMetrics {
-    id: countMetrics
-    font.family: root.bar ? root.bar.fontFamily : Style.font.family
-    font.pixelSize: Style.bar.iconFont
-    text: root.countText
+  // Muted when in sync, accent with something to review, urgent for conflicts and
+  // failures, and hollow while an action runs, like the other plugins' status dots.
+  readonly property color indicatorColor: Dashboard.severity === "error" ? Color.urgent
+    : Dashboard.severity === "attention" ? Color.accent : Color.muted
+  readonly property bool indicatorHollow: Dashboard.acting !== "" || !Dashboard.snapshot
+
+  Component {
+    id: miseStatusIcon
+
+    Item {
+      width: Style.bar.iconCanvas
+      height: width
+
+      MiseIcon {
+        anchors.fill: parent
+        iconSize: parent.width
+        color: root.bar ? root.bar.foreground : Color.foreground
+      }
+
+      Rectangle {
+        width: Style.space(6)
+        height: width
+        radius: width / 2
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        color: root.indicatorColor
+
+        Rectangle {
+          visible: root.indicatorHollow
+          anchors.centerIn: parent
+          width: Math.max(2, parent.width - 4)
+          height: width
+          radius: width / 2
+          color: root.bar ? root.bar.background : Color.background
+        }
+      }
+    }
   }
 
   BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    // Sync with an alert mark for conflicts and failures; plain sync otherwise.
-    text: Dashboard.severity === "error" ? "󰓧" : "󰓦"
-    labelText: root.countText
-    slotSize: Style.bar.iconSlot + (root.countText !== "" ? Math.ceil(countMetrics.advanceWidth) + Style.space(6) : 0)
-    active: Dashboard.severity === "error"
+    iconComponent: miseStatusIcon
+    slotSize: Style.bar.iconSlot
     tooltipText: root.opened ? "" : root.summary
     onPressed: function(mouseButton) {
       if (mouseButton === Qt.RightButton) Dashboard.fetch()

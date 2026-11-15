@@ -10,14 +10,16 @@ labelled with the scope it came from, so the same plugin works on any machine.
 
 ## What it shows
 
-- **Bar:** a sync icon. A count appears when incoming changes, conflicts, or
-  bootstrap changes need review; the icon turns urgent only for conflicts and
-  failures. Right-click checks origin; middle-click re-reads local state.
+- **Bar:** the mise chef with a status dot: muted when in sync, accent when
+  something needs review, urgent for conflicts and failures, hollow while an
+  action runs. The tooltip lists what is pending. Right-click checks origin;
+  middle-click re-reads local state.
 - **Changes:** conflicts, incoming changes, changes to publish, unsaved edits,
   bootstrap drift, and changes on other profiles, each opening a per-file diff.
 - **Sync:** origin, branch, mise's sync mode, last pull and publish, and
   automatic capture.
-- **Browse:** tracked dotfiles by scope with per-file history, bootstrap
+- **Browse:** tracked dotfiles by scope (click to open in your Omarchy default
+  editor, or view a file's history), bootstrap
   resources grouped by kind, the checkpoint history with diffs, and the config
   files mise loaded.
 
@@ -39,7 +41,8 @@ mise holds back, such as conflicts. It runs no sync timer of its own.
 
 ## Keyboard
 
-`j`/`k` or arrows move, `Enter` activates, `l` opens, `h` or `Esc` goes back,
+`j`/`k` or arrows move, `Enter` activates (opens a dotfile in your editor), `l`
+or `→` drills in (a dotfile's history), `h` or `Esc` goes back,
 `r` checks origin, and `Tab` moves to the neighbouring bar panel.
 
 Open a view directly, for example from a binding:
@@ -53,6 +56,9 @@ Views: `home`, `incoming`, `outgoing`, `conflicts`, `local`, `other`,
 `checkpoint:<id>`, `pathHistory:<~/path>`.
 
 ## Development
+
+The bar icon is the mise logo from `jdx/mise` (`docs/public/logo.svg`, MIT),
+drawn natively in `MiseIcon.qml` with a thickening stroke so it reads at bar size.
 
 Omarchy's package-managed `/etc/mise/conf.d` defaults are loaded for
 precedence but not listed, and their on-demand tools are left out.

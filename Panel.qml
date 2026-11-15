@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -298,6 +299,15 @@ Panel {
     ask(strings.t("confirm.undo"), strings.t("confirmButton.undo"), function() { Dashboard.act("undo", String(id)) })
   }
 
+  // Opens a tracked file or folder with the editor chosen under Omarchy defaults.
+  function openInEditor(path) {
+    var home = Quickshell.env("HOME")
+    var target = String(path).replace(/^~(?=\/|$)/, home)
+    if (target.indexOf(home + "/") !== 0 && target !== home) return
+    Quickshell.execDetached(["omarchy-launch-editor", target])
+    close()
+  }
+
   function runBootstrap() {
     Dashboard.openTerminal("bootstrap")
     close()
@@ -483,7 +493,10 @@ Panel {
           return
         }
         if (dx < 0) root.back()
-        else if (dx > 0) { if (root.cursorItem && root.cursorItem.drillable === true) root.activateCursor() }
+        else if (dx > 0) {
+          if (root.cursorItem && typeof root.cursorItem.drill === "function") root.cursorItem.drill()
+          else if (root.cursorItem && root.cursorItem.drillable === true) root.activateCursor()
+        }
         else root.moveCursor(dy)
       }
       onActivateRequested: {
@@ -932,7 +945,8 @@ Panel {
               detail: modelData.unsaved ? strings.t("state.unsaved") : attention ? modelData.state
                 : modelData.files > 1 ? root.count("dotfiles.files", modelData.files) : ""
               detailColor: attention ? root.urgent : modelData.unsaved ? root.accent : root.dim
-              onTriggered: root.go("pathHistory", modelData.name)
+              onTriggered: root.openInEditor(modelData.name)
+              onHistoryRequested: root.go("pathHistory", modelData.name)
             }
           }
         }
@@ -1423,9 +1437,11 @@ Panel {
     property string detail: ""
     property color detailColor: root.dim
     property bool cursorTarget: true
-    property bool drillable: true
+    property bool drillable: false
     signal triggered()
+    signal historyRequested()
     function activate() { pathRow.triggered() }
+    function drill() { pathRow.historyRequested() }
 
     readonly property string folder: root.dirName(path)
     hasCursor: root.cursorActive && root.cursorItem === pathRow
@@ -1471,7 +1487,7 @@ Panel {
     Text {
       id: detailText
       textFormat: Text.PlainText
-      anchors.right: chevron.left
+      anchors.right: rowActions.left
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       text: pathRow.detail
@@ -1480,16 +1496,34 @@ Panel {
       font.pixelSize: Style.font.caption
     }
 
-    Text {
-      id: chevron
-      textFormat: Text.PlainText
+    // Shown on the highlighted row only; the space stays reserved so names do not shift.
+    Row {
+      id: rowActions
       anchors.right: parent.right
-      anchors.rightMargin: Style.space(8)
+      anchors.rightMargin: Style.space(4)
       anchors.verticalCenter: parent.verticalCenter
-      text: "󰅂"
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
+      spacing: Style.space(2)
+      opacity: pathRow.hasCursor ? 1 : 0
+      enabled: pathRow.hasCursor
+
+      PanelActionButton {
+        iconText: "󰏫"
+        tooltipText: strings.t("dotfiles.open")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.bodySmall
+        onClicked: pathRow.activate()
+        onHovered: function(isHovered) { if (isHovered) root.setCursor(pathRow) }
+      }
+      PanelActionButton {
+        iconText: "󰋚"
+        tooltipText: strings.t("dotfiles.history")
+        foreground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: Style.font.bodySmall
+        onClicked: pathRow.drill()
+        onHovered: function(isHovered) { if (isHovered) root.setCursor(pathRow) }
+      }
     }
   }
 

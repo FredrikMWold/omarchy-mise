@@ -311,5 +311,7 @@
   },
   "sync.mode": "Mode",
   "mode.fetch-onlyEvery": "Fetches every %1",
-  "mode.syncEvery": "Syncs every %1"
+  "mode.syncEvery": "Syncs every %1",
+  "dotfiles.open": "Open in editor (Enter)",
+  "dotfiles.history": "History (→)"
 }
