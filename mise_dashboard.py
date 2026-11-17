@@ -336,7 +336,9 @@ class Client:
             if source:
                 scope, config = source
             action = clean(action, 100)
-            state = ("ok" if action == "noop" else action if action in ("on-demand", "always")
+            state = ("ok" if action == "noop"
+                     else "always" if source_kind == "hook" and action == "run"
+                     else action if action in ("on-demand", "always")
                      else "unknown" if action == "unknown" else "pending")
             seen.add((source_kind, name))
             result.append({

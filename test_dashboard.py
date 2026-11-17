@@ -94,6 +94,31 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual([line["s"] for line in lines[1:6]],
                          ["set -eu", "install_plugin() {", '  id="$1"', "}", "install_plugin a b"])
 
+    def test_bootstrap_plan_hooks_are_always_run_not_pending(self):
+        names = ["pre-repos:1", "post-repos:1", "post-repos:2"]
+        plan = {"resources": [
+            {"id": {"kind": "hook", "name": name}, "action": "run",
+             "current": "not run", "desired": "true"}
+            for name in names
+        ]}
+
+        rows = Client().bootstrap_rows({}, plan, {})
+
+        self.assertEqual([(row["name"], row["action"], row["state"]) for row in rows],
+                         [(name, "run", "always") for name in names])
+
+    def test_bootstrap_plan_preserves_resource_drift_and_unknown_hooks(self):
+        plan = {"resources": [
+            {"id": {"kind": "package", "name": "pacman:git"}, "action": "create"},
+            {"id": {"kind": "user-service", "name": "mise-history"}, "action": "start"},
+            {"id": {"kind": "repo", "name": "~/project"}, "action": "noop"},
+            {"id": {"kind": "hook", "name": "post-repos:1"}, "action": "unknown"},
+        ]}
+
+        rows = Client().bootstrap_rows({}, plan, {})
+
+        self.assertEqual([row["state"] for row in rows], ["pending", "pending", "ok", "unknown"])
+
     def test_profiles_come_from_mise_selected_configs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
