@@ -615,7 +615,20 @@ class Client:
         if kind == "local":
             text, _ = self.call("dot", "history", "diff", "--patch", timeout=90)
         elif kind == "conflicts":
+            status = self.json("dot", "status", "--json")
+            entries = conflict_entries((status.get("history") or {}).get("sync") or {})
             text, _ = self.call("dot", "conflicts", timeout=90)
+            parsed = parse_patch(text, self.repo_display)
+            known = {item["path"] for item in parsed["files"]}
+            for item in entries:
+                if item["path"] not in known:
+                    parsed["files"].append({
+                        "path": item["path"], "scope": "", "repo_path": "",
+                        "status": "modified", "additions": 0, "deletions": 0,
+                        "binary": False, "lines": [], "omitted": 0,
+                        "reason": item["reason"],
+                    })
+            return dict(parsed, kind=kind)
         elif kind == "deployment":
             text, _ = self.call("dot", "diff", timeout=90)
         elif kind == "checkpoint":

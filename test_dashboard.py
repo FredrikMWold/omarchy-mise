@@ -53,6 +53,21 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(conflict_entries({"conflicts": [["~/clash.txt", "why"]]}),
                          [{"path": "~/clash.txt", "reason": "why"}])
 
+    def test_conflict_review_falls_back_to_status_when_mise_has_no_patch(self):
+        client = Client()
+        client.json = lambda *args, **kwargs: {
+            "history": {"sync": {"conflicts": [
+                ["~/.config/mise/config.toml", "incoming configuration is invalid"],
+            ]}},
+        }
+        client.call = lambda *args, **kwargs: ("", "mise no sharing conflicts\n")
+
+        review = client.review("conflicts")
+
+        self.assertEqual([(item["path"], item["reason"]) for item in review["files"]], [
+            ("~/.config/mise/config.toml", "incoming configuration is invalid"),
+        ])
+
     def test_patch_limits_and_untrusted_text(self):
         long = "+" + "x" * 2000
         text = "diff --git a/home/a b/home/a\n@@ -0,0 +1 @@\n" + "\n".join([long] * 700)
