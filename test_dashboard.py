@@ -139,17 +139,18 @@ class ParsingTests(unittest.TestCase):
         url = "https://example.invalid/repo"
         repos = [
             {"path": str(client.home / name), "path_raw": f"~/{name}", "url": url,
-             "origin": origin, "ref": ref, "state": state, "reason": "local changes"}
+             "origin": origin, "ref": ref, "current_ref": "main", "state": state, "reason": "local changes"}
             for name, origin, ref, state in (
                 ("work", url, None, "dirty"),
                 ("missing", None, None, "missing"),
                 ("wrong-origin", "https://example.invalid/other", None, "dirty"),
                 ("pinned", url, "v1", "dirty"),
+                ("on-branch", url, "main", "dirty"),
             )
         ]
         plan = {"resources": [
             {"id": {"kind": "repo", "name": repo["path"]}, "action": action}
-            for repo, action in zip(repos, ("unknown", "create", "unknown", "unknown"))
+            for repo, action in zip(repos, ("unknown", "create", "unknown", "unknown", "unknown"))
         ]}
         rows = client.bootstrap_rows({"repos": repos}, plan, {
             ("repo", "~/work"): ("common", str(client.home / ".config/mise/config.toml")),
@@ -157,7 +158,7 @@ class ParsingTests(unittest.TestCase):
 
         self.assertEqual([(row["name"], row["state"]) for row in rows], [
             ("~/work", "ok"), ("~/missing", "pending"),
-            ("~/wrong-origin", "unknown"), ("~/pinned", "unknown"),
+            ("~/wrong-origin", "unknown"), ("~/pinned", "unknown"), ("~/on-branch", "ok"),
         ])
         self.assertEqual(rows[0]["scope"], "common")
 

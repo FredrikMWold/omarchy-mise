@@ -357,8 +357,8 @@ class Client:
             desired = item.get("ref") or item.get("url", "")
             state = item["state"]
             action = planned["action"] if planned else ("noop" if state == "current" else state)
-            # An unpinned checkout at the declared origin already meets bootstrap's goal.
-            if (state == "dirty" and not item.get("ref") and item.get("url")
+            # A checkout at the declared origin and ref already meets bootstrap's goal; mise never manages its edits.
+            if (state == "dirty" and item.get("ref") in (None, "", item.get("current_ref")) and item.get("url")
                     and item.get("origin") == item["url"] and action in ("dirty", "unknown", "noop")):
                 append("repo", name, "present (local edits)", desired, "noop")
             elif planned:
