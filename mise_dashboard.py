@@ -323,12 +323,15 @@ class Client:
                     if kind == "tool" and (kind, name) not in declarations \
                             and isinstance(spec, dict) and spec.get("lazy") is True:
                         self.lazy_tools.add(name)
-                    declarations.setdefault((kind, name), (scope, str(path)))
+                    declarations.setdefault((kind, self.tilde(name) if kind == "repo" else name),
+                                            (scope, str(path)))
         return configs, declarations
 
     def bootstrap_rows(self, status, plan, declarations):
         result = []
         seen = set()
+        repos = {self.tilde(item["path"]): item
+                 for item in rows(status.get("repos", []), "repositories")}
 
         def append(kind, name, current, desired, action, scope=None, config=None):
             source_kind = "service" if kind in ("user_services", "services") else kind
@@ -348,15 +351,33 @@ class Client:
                 "config": self.tilde(clean(config or "", 2048)),
             })
 
+        def append_repo(name, item, planned=None):
+            name = self.tilde(item.get("path_raw") or name)
+            current = item.get("current_ref") or item.get("reason", "")
+            desired = item.get("ref") or item.get("url", "")
+            state = item["state"]
+            action = planned["action"] if planned else ("noop" if state == "current" else state)
+            # An unpinned checkout at the declared origin already meets bootstrap's goal.
+            if (state == "dirty" and not item.get("ref") and item.get("url")
+                    and item.get("origin") == item["url"] and action in ("dirty", "unknown", "noop")):
+                append("repo", name, "present (local edits)", desired, "noop")
+            elif planned:
+                append("repo", name, planned.get("current", current), planned.get("desired", desired), action)
+            else:
+                append("repo", name, current, desired, action)
+
         for item in rows(plan.get("resources"), "bootstrap resources"):
             identity = item["id"]
-            append(identity["kind"], identity["name"], item.get("current", ""),
-                   item.get("desired", ""), item["action"])
-        for item in rows(status.get("repos", []), "repositories"):
-            append("repo", item.get("path_raw", item["path"]),
-                   item.get("current_ref") or item.get("reason", ""),
-                   item.get("ref") or item.get("url", ""),
-                   "noop" if item["state"] == "current" else item["state"])
+            kind, name = identity["kind"], identity["name"]
+            if kind == "repo":
+                name = self.tilde(name)
+                repo = repos.pop(name, None)
+                if repo is not None:
+                    append_repo(name, repo, item)
+                    continue
+            append(kind, name, item.get("current", ""), item.get("desired", ""), item["action"])
+        for name, item in repos.items():
+            append_repo(name, item)
         for item in rows(status.get("tools", []), "tools"):
             append("tool", item["tool"], item.get("resolved_version") or item["state"],
                    item.get("requested_version", ""),
@@ -644,7 +665,7 @@ class Client:
         elif kind == "path-history":
             return {"kind": kind, "checkpoints": self.checkpoints(argument, 50)}
         elif kind == "bootstrap":
-            output, _ = self.call("bootstrap", "--dry-run", timeout=180, merge=True)
+            output, _ = self.call("bootstrap", "--skip-dirty", "--dry-run", timeout=180, merge=True)
             return {"kind": kind, "log": parse_log(output)}
         else:
             raise DashboardError("Unknown review")
@@ -735,7 +756,7 @@ class Client:
         bold, dim, reset = "\033[1m", "\033[2m", "\033[0m"
         print(f"{bold}mise bootstrap{reset} {dim}(common + {', '.join(self.active_profiles) or 'no profile'}){reset}\n")
         print(f"{dim}Fresh preview:{reset}")
-        output, _ = self.call("bootstrap", "--dry-run", timeout=180, merge=True)
+        output, _ = self.call("bootstrap", "--skip-dirty", "--dry-run", timeout=180, merge=True)
         for line in parse_log(output):
             prefix = {"stage": "\n▸ ", "ok": "  ✓ ", "run": "  $ "}.get(line["t"], "  · ")
             print(prefix + line["s"])
@@ -746,7 +767,7 @@ class Client:
         with self.operation_lock():
             self.record_action("bootstrap", "running")
             self.notify_shell()
-            code = subprocess.call(self.command + ["bootstrap"], env=self.env, cwd=self.home)
+            code = subprocess.call(self.command + ["bootstrap", "--skip-dirty"], env=self.env, cwd=self.home)
             self.record_action("bootstrap", "succeeded" if code == 0 else "failed",
                                "" if code == 0 else f"exit {code}")
             self.notify_shell()

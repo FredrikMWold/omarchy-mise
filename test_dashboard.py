@@ -119,6 +119,33 @@ class ParsingTests(unittest.TestCase):
 
         self.assertEqual([row["state"] for row in rows], ["pending", "pending", "ok", "unknown"])
 
+    def test_bootstrap_counts_missing_checkouts_but_not_local_edits(self):
+        client = Client()
+        url = "https://example.invalid/repo"
+        repos = [
+            {"path": str(client.home / name), "path_raw": f"~/{name}", "url": url,
+             "origin": origin, "ref": ref, "state": state, "reason": "local changes"}
+            for name, origin, ref, state in (
+                ("work", url, None, "dirty"),
+                ("missing", None, None, "missing"),
+                ("wrong-origin", "https://example.invalid/other", None, "dirty"),
+                ("pinned", url, "v1", "dirty"),
+            )
+        ]
+        plan = {"resources": [
+            {"id": {"kind": "repo", "name": repo["path"]}, "action": action}
+            for repo, action in zip(repos, ("unknown", "create", "unknown", "unknown"))
+        ]}
+        rows = client.bootstrap_rows({"repos": repos}, plan, {
+            ("repo", "~/work"): ("common", str(client.home / ".config/mise/config.toml")),
+        })
+
+        self.assertEqual([(row["name"], row["state"]) for row in rows], [
+            ("~/work", "ok"), ("~/missing", "pending"),
+            ("~/wrong-origin", "unknown"), ("~/pinned", "unknown"),
+        ])
+        self.assertEqual(rows[0]["scope"], "common")
+
     def test_profiles_come_from_mise_selected_configs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -176,6 +203,21 @@ class SafetyTests(unittest.TestCase):
                 patch("subprocess.call") as apply, contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(client.terminal("bootstrap"), 0)
         apply.assert_not_called()
+
+    def test_bootstrap_preview_and_apply_skip_dirty_checkouts(self):
+        client = Client()
+        with patch.object(client, "call", return_value=("", "")) as preview, \
+                patch.object(client, "operation_lock", return_value=contextlib.nullcontext()), \
+                patch.object(client, "record_action"), patch.object(client, "notify_shell"), \
+                patch("sys.stdin.isatty", return_value=True), patch("builtins.input", side_effect=["y", ""]), \
+                patch("subprocess.call", return_value=0) as apply, contextlib.redirect_stdout(io.StringIO()):
+            client.review("bootstrap")
+            self.assertEqual(client.terminal("bootstrap"), 0)
+        self.assertEqual(len(preview.call_args_list), 2)
+        for invocation in preview.call_args_list:
+            self.assertEqual(invocation.args, ("bootstrap", "--skip-dirty", "--dry-run"))
+        apply.assert_called_once_with(client.command + ["bootstrap", "--skip-dirty"],
+                                      env=client.env, cwd=client.home)
 
 
 @unittest.skipUnless(shutil.which("mise") and shutil.which("git"), "mise and git are required")
