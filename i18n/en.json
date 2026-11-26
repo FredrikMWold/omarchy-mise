@@ -256,6 +256,7 @@
   "kind.package": "Packages",
   "kind.tool": "Tools",
   "kind.repo": "Repositories",
+  "kind.dotfile": "Dotfiles",
   "kind.service": "Services",
   "kind.systemd": "Systemd units",
   "kind.files": "Files",

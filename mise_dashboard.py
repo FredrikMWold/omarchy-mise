@@ -506,6 +506,34 @@ class Client:
 
     # Snapshot -----------------------------------------------------------------------
 
+    def dotfile_row(self, item, unsaved=()):
+        origin = item.get("origin") or {}
+        config = origin.get("config", "")
+        environments = origin.get("environment") or []
+        # Whole-file entries name a `target` or `file`; partial edits such as merges name a `path`.
+        name = clean(item.get("target") or item.get("file") or item.get("path") or "", 2048)
+        return {
+            "name": name,
+            "state": clean(item.get("state", "unknown"), 100),
+            "mode": clean(item.get("mode") or item.get("edit") or "edit", 100),
+            "scope": ",".join(environments) if environments else self.scope(config),
+            "config": self.tilde(clean(config, 2048)),
+            "files": item.get("nested") or 0,
+            "unsaved": bool(name) and any(path == name or path.startswith(name.rstrip("/") + "/")
+                                          for path in unsaved),
+        }
+
+    @staticmethod
+    def dotfile_resources(dotfiles, resources):
+        """Bootstrap's dotfile stages fix entries out of their desired state; its plan omits them."""
+        listed = {(row["kind"], row["name"]) for row in resources}
+        return [{"kind": "dotfile", "name": item["name"], "current": item["state"],
+                 "desired": item["mode"], "action": "update", "state": "pending",
+                 "scope": item["scope"], "config": item["config"]}
+                for item in dotfiles
+                if item["name"] and item["state"] not in ("tracked", "applied", "absent", "orphaned")
+                and ("dotfile", item["name"]) not in listed]
+
     def snapshot(self):
         data = {"checked_at": datetime.datetime.now().astimezone().isoformat(),
                 "errors": [], "configs": [], "dotfiles": [], "resources": [],
@@ -531,19 +559,7 @@ class Client:
             unsaved = {str(item.get("path", item)) if isinstance(item, dict) else str(item)
                        for item in history.get("unsaved") or []}
             for item in rows(dot.get("files", []) + dot.get("edits", []) + dot.get("orphaned", []), "dotfiles"):
-                origin = item.get("origin") or {}
-                config = origin.get("config", "")
-                environments = origin.get("environment") or []
-                name = clean(item.get("target", item.get("file", "")), 2048)
-                data["dotfiles"].append({
-                    "name": name,
-                    "state": clean(item.get("state", "unknown"), 100),
-                    "mode": clean(item.get("mode", "edit"), 100),
-                    "scope": ",".join(environments) if environments else self.scope(config),
-                    "config": self.tilde(clean(config, 2048)),
-                    "files": item.get("nested") or 0,
-                    "unsaved": any(path == name or path.startswith(name.rstrip("/") + "/") for path in unsaved),
-                })
+                data["dotfiles"].append(self.dotfile_row(item, unsaved))
             data["changes"] = collect("Origin comparison", lambda: self.sync_changes(history))
         status = collect("Bootstrap status", lambda: self.json("bootstrap", "status", "--json"))
         plan = collect("Bootstrap plan", lambda: self.json("bootstrap", "plan", "--json"))
@@ -555,7 +571,7 @@ class Client:
                     if resource["kind"] == "dotfile" and resource["name"] in origins:
                         resource.update(scope=origins[resource["name"]]["scope"],
                                         config=origins[resource["name"]]["config"])
-                data["resources"] = result
+                data["resources"] = result + self.dotfile_resources(data["dotfiles"], result)
         checkpoints = collect("History", lambda: self.checkpoints())
         if checkpoints is not None:
             data["checkpoints"] = checkpoints

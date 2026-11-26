@@ -119,6 +119,21 @@ class ParsingTests(unittest.TestCase):
 
         self.assertEqual([row["state"] for row in rows], ["pending", "pending", "ok", "unknown"])
 
+    def test_merged_dotfile_edits_keep_their_path(self):
+        row = Client().dotfile_row({
+            "path": "~/.copilot/settings.json", "edit": "merge:shared", "state": "differs",
+            "origin": {"config": str(Path.home() / ".config/mise/config.toml"), "environment": []},
+        })
+        self.assertEqual((row["name"], row["mode"], row["state"], row["scope"]),
+                         ("~/.copilot/settings.json", "merge:shared", "differs", "common"))
+
+    def test_undeployed_dotfiles_are_pending_bootstrap_work(self):
+        dotfiles = [{"name": f"~/{state}", "state": state, "mode": "merge:x", "scope": "common", "config": ""}
+                    for state in ("differs", "missing", "applied", "tracked", "orphaned")]
+        rows = Client.dotfile_resources(dotfiles, [{"kind": "dotfile", "name": "~/missing"}])
+        self.assertEqual([(row["kind"], row["name"], row["state"]) for row in rows],
+                         [("dotfile", "~/differs", "pending")])
+
     def test_bootstrap_counts_missing_checkouts_but_not_local_edits(self):
         client = Client()
         url = "https://example.invalid/repo"

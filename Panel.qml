@@ -344,7 +344,7 @@ Panel {
     return n(group.items.length) + " " + scopeLabel(group.scope)
   }).join(" · ")
 
-  readonly property var kindOrder: ["package", "tool", "repo", "service", "systemd", "files", "accounts",
+  readonly property var kindOrder: ["package", "tool", "repo", "dotfile", "service", "systemd", "files", "accounts",
     "compose", "firewall", "login_shell", "hook", "task"]
 
   readonly property var resourceGroups: {
@@ -1013,6 +1013,7 @@ Panel {
         spacing: Style.space(12)
 
         Text {
+          id: bootstrapGlyph
           textFormat: Text.PlainText
           anchors.verticalCenter: parent.verticalCenter
           text: Dashboard.bootstrapPending > 0 ? "󰏗" : "󰗠"
@@ -1023,7 +1024,7 @@ Panel {
 
         Column {
           anchors.verticalCenter: parent.verticalCenter
-          width: parent.width - Style.space(40)
+          width: parent.width - bootstrapGlyph.width - parent.spacing
           spacing: Style.space(2)
 
           Text {
@@ -1326,16 +1327,6 @@ Panel {
     fontFamily: root.fontFamily
     opacity: enabled ? 1 : 0.4
     onHovered: function(isHovered) { if (isHovered && actionButton.enabled && actionButton.cursorTarget) root.setCursor(actionButton) }
-
-    Rectangle {
-      anchors.fill: parent
-      anchors.margins: -Style.space(2)
-      visible: actionButton.hasCursor
-      color: "transparent"
-      radius: Style.cornerRadius > 0 ? Style.cornerRadius + Style.space(2) : 0
-      border.width: Math.max(1, Style.normalBorderWidth)
-      border.color: root.accent
-    }
   }
 
   component NavRow: CursorSurface {
@@ -2026,10 +2017,12 @@ Panel {
     radius: Style.cornerRadius
     clip: true
 
+    // Inset by the border so highlighted lines don't paint over it.
     Column {
       id: diffColumn
+      x: diffBlock.borderLeft
       y: Style.space(4)
-      width: parent.width
+      width: parent.width - diffBlock.borderLeft - diffBlock.borderRight
 
       Text {
         textFormat: Text.PlainText
